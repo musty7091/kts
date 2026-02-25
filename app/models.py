@@ -3,6 +3,7 @@ from . import db
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 import enum # enum modülünü import et
+import json
 
 # Kargo Durumları için Enum Tanımlaması
 class KargoDurumEnum(enum.Enum):
@@ -195,3 +196,94 @@ class OdemeKargoIliskileri(db.Model):
     
     def __repr__(self):
         return f'<İlişki Ödeme {self.odeme_id} - Kargo {self.kargo_id}>'
+
+
+# -----------------------------
+# P0-3: Audit Log (kritik aksiyon kayıtları)
+# -----------------------------
+class AuditLog(db.Model):
+    __tablename__ = "audit_log"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    # Kim yaptı?
+    actor_type = db.Column(db.String(20), nullable=False, default="system")  # admin / isletme / kurye / system
+    actor_id = db.Column(db.Integer, nullable=True)
+
+    # Ne yaptı?
+    action = db.Column(db.String(120), nullable=False)  # ör: "LOGIN_SUCCESS", "KARGO_OLUSTUR", "KARGO_DURUM_GUNCELLE"
+    entity_type = db.Column(db.String(60), nullable=True)  # ör: "Kargolar", "Isletmeler"
+    entity_id = db.Column(db.Integer, nullable=True)
+
+    # Nereden yaptı?
+    ip = db.Column(db.String(45), nullable=True)  # IPv4/IPv6
+    user_agent = db.Column(db.String(255), nullable=True)
+
+    # Ek detay
+    details_json = db.Column(db.Text, nullable=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
+
+    # Basit indexler (SQLite'da da çalışır)
+    __table_args__ = (
+        db.Index("ix_audit_log_created_at", "created_at"),
+        db.Index("ix_audit_log_actor", "actor_type", "actor_id"),
+        db.Index("ix_audit_log_entity", "entity_type", "entity_id"),
+        db.Index("ix_audit_log_action", "action"),
+    )
+
+    def __repr__(self):
+        return f"<AuditLog {self.id} {self.actor_type}:{self.actor_id} {self.action} {self.entity_type}:{self.entity_id}>"
+
+    def details(self):
+        """
+        details_json alanını dict olarak döndürür.
+        Bozuk JSON varsa güvenli şekilde None döner.
+        """
+        if not self.details_json:
+            return None
+        try:
+            return json.loads(self.details_json)
+        except Exception:
+            return None
+
+
+def create_audit_log(
+    actor_type="system",
+    actor_id=None,
+    action="",
+    entity_type=None,
+    entity_id=None,
+    ip=None,
+    user_agent=None,
+    details=None,
+):
+    """
+    Audit log kaydı oluşturur.
+    - details dict/list gibi bir şey ise JSON'a çevirir.
+    - commit yapmaz: çağıran yer isterse commit eder (batch performansı).
+    """
+    if not action:
+        # action boş olmasın; sessizce iptal etmek yerine açık hata üretelim
+        raise ValueError("create_audit_log: action boş olamaz.")
+
+    details_json = None
+    if details is not None:
+        try:
+            details_json = json.dumps(details, ensure_ascii=False, default=str)
+        except Exception:
+            # details JSON'a çevrilemezse ham stringe düş
+            details_json = json.dumps({"raw": str(details)}, ensure_ascii=False)
+
+    log = AuditLog(
+        actor_type=str(actor_type or "system")[:20],
+        actor_id=actor_id,
+        action=str(action)[:120],
+        entity_type=(str(entity_type)[:60] if entity_type is not None else None),
+        entity_id=entity_id,
+        ip=(str(ip)[:45] if ip else None),
+        user_agent=(str(user_agent)[:255] if user_agent else None),
+        details_json=details_json,
+    )
+    db.session.add(log)
+    return log
