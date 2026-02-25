@@ -27,6 +27,10 @@ def login():
         sifre = request.form.get('sifre')
         admin = AdminKullanicilar.query.filter_by(kullanici_adi=kullanici_adi).first()
         if admin and check_password_hash(admin.sifre_hash, sifre):
+            # P0: Session fixation azaltma - yeni oturum başlat
+            session.clear()
+            session.permanent = True
+
             session['admin_id'] = admin.id
             session['admin_kullanici_adi'] = admin.kullanici_adi
             flash('Giriş başarılı!', 'success')
@@ -72,8 +76,8 @@ def dashboard():
 
 @bp_admin.route('/logout')
 def logout():
-    session.pop('admin_id', None)
-    session.pop('admin_kullanici_adi', None)
+    # P0: Oturum temizliği (tüm session verilerini kapat)
+    session.clear()
     flash('Başarıyla çıkış yaptınız.', 'success')
     return redirect(url_for('bp_common.index'))
 
@@ -364,8 +368,8 @@ def settings():
     current_admin_user = AdminKullanicilar.query.get(session['admin_id'])
     if not current_admin_user: 
         flash('Admin kullanıcı bilgileri bulunamadı. Lütfen tekrar giriş yapın.', 'error')
-        session.pop('admin_id', None)
-        session.pop('admin_kullanici_adi', None)
+        # P0: Oturum temizliği
+        session.clear()
         return redirect(url_for('bp_admin.login'))
 
     def get_settings_dict():
@@ -441,8 +445,8 @@ def settings():
                         current_admin_user.sifre_hash = generate_password_hash(new_password)
                         db.session.commit()
                         # Şifre başarıyla değiştirildi, oturumu sonlandır ve giriş sayfasına yönlendir
-                        session.pop('admin_id', None)
-                        session.pop('admin_kullanici_adi', None)
+                        # P0: Şifre değişince oturumu kapat (session fixation/hijyen)
+                        session.clear()
                         flash('Admin şifreniz başarıyla güncellendi! Güvenlik nedeniyle tekrar giriş yapmanız gerekmektedir.', 'success')
                         return redirect(url_for('bp_admin.login')) 
                     except Exception as e:
@@ -844,21 +848,10 @@ def isletme_bakiyeleri():
                 Kargolar.isletmeye_aktarildi_mi == False # Henüz mahsuplaşmamış olanlar
             ).scalar() or Decimal('0.00')
             
-            # Daha önce yapılmış ve mahsuplaşmış ödemeler/alacaklar (bunlar bakiyeyi etkilememeli, çünkü kargolar zaten kapatıldı)
-            # Bu yüzden net bakiye hesabı sadece 'isletmeye_aktarildi_mi == False' olan kargolar üzerinden yapılmalı.
-            # Ancak, genel bir fikir vermesi açısından toplam yapılmış ödemeler de gösterilebilir.
-            # Şimdiki mantıkta, `yapilmis_odemeler_toplami` net bakiyeden düşülüyor, bu doğru.
-            
             yapilmis_odemeler_toplami = db.session.query(
                 func.sum(IsletmeOdemeleri.odenen_tutar)
             ).filter(IsletmeOdemeleri.isletme_id == isletme_obj_bakiye.id).scalar() or Decimal('0.00')
 
-            # Net Bakiye: (Tahsil edilecek ürün bedelleri) - (Kesilecek hizmet bedelleri) - (Daha önce yapılan ödemeler/alacaklar)
-            # isletmeye_aktarilacak_tutar: Kapıda nakitte ürün bedeli, diğerlerinde 0.
-            # kargo_ucreti_isletme_borcu: Standart hizmet bedeli veya (standart - alıcıdan alınan kargo ücreti)
-            # Dolayısıyla, (isletmeye_aktarilacak_tutar - kargo_ucreti_isletme_borcu) her bir kargonun işletmeye net etkisidir.
-            # Bu net etkilerin toplamı, işletmenin o anki toplam alacağı/borcudur (henüz mahsuplaşmamış kargolar için).
-            
             net_mahsuplasmamis_bakiye = db.session.query(
                 func.sum(Kargolar.isletmeye_aktarilacak_tutar - Kargolar.kargo_ucreti_isletme_borcu)
             ).filter(
@@ -866,14 +859,6 @@ def isletme_bakiyeleri():
                 Kargolar.kargo_durumu == KargoDurumEnum.TESLIM_EDILDI,
                 Kargolar.isletmeye_aktarildi_mi == False
             ).scalar() or Decimal('0.00')
-            
-            # Genel bakiye, mahsuplaşmamış kargoların net etkisi eksi daha önce yapılmış tüm ödemelerdir.
-            # Bu mantık biraz karışık olabilir. Belki de `IsletmeOdemeleri` tablosundaki `odenen_tutar`
-            # zaten `isletmeye_aktarildi_mi = True` olan kargoların net etkisini yansıtıyordur.
-            # Eğer `record_payment` doğru çalışıyorsa, `IsletmeOdemeleri.odenen_tutar` işletmeye yapılan
-            # net ödemeyi (veya işletmeden alınan net borcu) gösterir.
-            # Bu durumda, işletmenin toplam alacağı/borcu:
-            # (Tüm teslim edilmiş kargoların (isletmeye_aktarilacak_tutar - kargo_ucreti_isletme_borcu) toplamı) - (Tüm IsletmeOdemeleri.odenen_tutar toplamı)
             
             tum_kargolarin_net_etkisi = db.session.query(
                  func.sum(Kargolar.isletmeye_aktarilacak_tutar - Kargolar.kargo_ucreti_isletme_borcu)
@@ -928,16 +913,12 @@ def record_payment(isletme_id):
         today_date_str = date.today().strftime('%Y-%m-%d')
 
         if request.method == 'POST':
-            # ... (POST bloğunun içeriği - burası şimdilik önemli değil, hata GET request'te oluşuyor) ...
-            # POST bloğunda hata olsa bile, en alttaki render_template yine yukarıda hesaplanan
-            # kargolar_data_template'i kullanır.
             odeme_tarihi_str = request.form.get('odeme_tarihi')
             islem_referansi = request.form.get('islem_referansi')
             secilen_kargo_idler_str = request.form.getlist('kargo_ids')
 
             if not odeme_tarihi_str:
                 flash('Ödeme tarihi zorunludur.', 'error')
-                # Hata durumunda template'e secilen_kargo_idler'i de gönderelim ki checkbox'lar korunabilsin
                 return render_template('admin_record_payment.html', isletme=isletme_obj_payment, kargolar_data=kargolar_data_template, today_date=today_date_str, secilen_kargo_idler=request.form.getlist('kargo_ids'))
             if not secilen_kargo_idler_str:
                 flash('Lütfen mahsuplaşmaya dahil edilecek en az bir kargo seçin.', 'error')
@@ -1005,10 +986,8 @@ def record_payment(isletme_id):
                 flash(f"Ödeme kaydedilirken bir hata oluştu: {str(e)}", 'error')
                 current_app.logger.error(f"Ödeme kaydı hatası: {e}", exc_info=True)
             
-            # POST içinde bir hata olursa, formu tekrar render et
             return render_template('admin_record_payment.html', isletme=isletme_obj_payment, kargolar_data=kargolar_data_template, today_date=today_date_str, secilen_kargo_idler=request.form.getlist('kargo_ids'))
 
-        # GET request için
         return render_template('admin_record_payment.html', isletme=isletme_obj_payment, kargolar_data=kargolar_data_template, today_date=today_date_str)
 
 @bp_admin.route('/business_payment_history/<int:isletme_id>')
