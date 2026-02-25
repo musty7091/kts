@@ -1,0 +1,127 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Ödeme Detayları ID: {{ odeme_detayi.id if odeme_detayi else '' }} - İşletme Paneli{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Ödeme Detayları</h2>
+        <a href="{{ url_for('bp_business.payments') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left mr-1"></i> Ödeme Geçmişine Geri Dön
+        </a>
+    </div>
+
+    {% if odeme_detayi %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-info text-white">
+            <h3 class="mb-0 h5">Ödeme Özeti (ID: {{ odeme_detayi.id }})</h3>
+        </div>
+        <div class="card-body">
+            <dl class="row">
+                <dt class="col-sm-4">Ödeme Tarihi:</dt>
+                <dd class="col-sm-8">{{ odeme_detayi.odeme_tarihi.strftime('%d-%m-%Y') }}</dd>
+
+                <dt class="col-sm-4">Net Ödenen/Alınan Tutar:</dt>
+                <dd class="col-sm-8 font-weight-bold {% if odeme_detayi.odenen_tutar < 0 %}text-danger{% elif odeme_detayi.odenen_tutar > 0 %}text-success{% else %}text-muted{% endif %}">
+                    {{ "%.2f"|format(odeme_detayi.odenen_tutar) }} TL
+                </dd>
+
+                <dt class="col-sm-4">Açıklama/Referans:</dt>
+                <dd class="col-sm-8">{{ odeme_detayi.aciklama if odeme_detayi.aciklama else (odeme_detayi.islem_referansi if odeme_detayi.islem_referansi else '-') }}</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-light">
+            <h3 class="mb-0 h5">Bu Ödeme/Mahsup ile İlişkili Kargolar</h3>
+        </div>
+        <div class="card-body">
+            {% if iliskili_kargolar %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover table-bordered table-sm">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Takip No</th>
+                            <th>Alıcı Adı</th>
+                            <th class="text-right">İlgili Kargo Tutarı (TL)</th>
+                            <th>Kargo Teslim Tarihi</th>
+                            <th class="text-center">Detay</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for kargo in iliskili_kargolar %}
+                        <tr>
+                            <td><span class="badge badge-secondary">{{ kargo.takip_numarasi }}</span></td>
+                            <td>{{ kargo.alici_adi_soyadi }}</td>
+                            {# Bu ödemeyle ilişkili kargonun işletmeye aktarılan tutarı gösteriliyor #}
+                            <td class="text-right">{{ "%.2f"|format(kargo.isletmeye_aktarilacak_tutar) }}</td>
+                            <td>{{ kargo.teslim_tarihi.strftime('%d-%m-%Y %H:%M') if kargo.teslim_tarihi else '-' }}</td>
+                            <td class="text-center">
+                                <a href="{{ url_for('bp_business.shipment_details', kargo_id=kargo.id) }}" class="btn btn-xs btn-outline-info" title="Kargo Detayları">
+                                    <i class="fas fa-search"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-warning">Bu ödeme/mahsup kaydı ile doğrudan ilişkili kargo bulunmamaktadır.</div>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-danger text-center">Ödeme detayı bulunamadı.</div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    .table thead th {
+        background-color: #e9ecef;
+        font-weight: 600;
+        font-size: 0.85rem; /* Biraz daha küçük başlıklar */
+    }
+
+    .table td {
+        font-size: 0.8rem; /* Biraz daha küçük hücre içeriği */
+        vertical-align: middle;
+    }
+
+    .table-sm th, .table-sm td {
+        padding: 0.4rem; /* Daha kompakt tablo */
+    }
+
+    .btn-xs { /* Çok küçük butonlar için özel sınıf */
+        padding: 0.15rem 0.3rem;
+        font-size: 0.7rem;
+        line-height: 1.5;
+        border-radius: 0.2rem;
+    }
+
+    .card-header h3.h5 {
+        font-size: 1.15rem; /* Kart başlıklarını biraz daha kompakt yapalım */
+        font-weight: 500;
+    }
+
+    h2.mb-0 {
+        font-size: 1.75rem;
+    }
+
+    dl.row dt {
+        font-weight: 500;
+    }
+
+    dl.row dd {
+        margin-bottom: .5rem;
+    }
+</style>
+{% endblock %}
+
+{% block scripts_extra %}
+    {# Bu sayfaya özel JavaScript (varsa) #}
+{% endblock %}

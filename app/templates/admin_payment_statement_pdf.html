@@ -1,0 +1,268 @@
+﻿<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Ödeme Ekstresi - {{ odeme_kaydi.isletme.isletme_adi }} - {{ odeme_kaydi.id }}</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 0.8cm; /* Kenar boşluğunu biraz daha azaltabiliriz, örn: 0.8cm */
+        }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif; /* Daha yaygın ve genellikle iyi render edilen fontlar */
+            font-size: 8.5pt; /* Genel font boyutunu biraz daha küçülttük */
+            line-height: 1.3;
+            color: #333;
+        }
+
+        .logo-container {
+            /* ... (logo stilleri önceki gibi) ... */
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 1.5px solid #3498db; /* Çizgi kalınlığını ayarladık */
+            padding-bottom: 10px;
+        }
+
+            .header h1 {
+                font-size: 18pt; /* Biraz küçülttük */
+                margin: 0 0 3px 0;
+                color: #2c3e50;
+                font-weight: bold;
+            }
+
+            .header p {
+                font-size: 9pt; /* Biraz küçülttük */
+                color: #555;
+            }
+
+        .section-title {
+            font-size: 12pt; /* Biraz küçülttük */
+            color: #333;
+            margin-top: 15px;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 4px;
+            font-weight: bold; /* Tekrar kalın yaptık, daha standart */
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            table-layout: fixed;
+        }
+
+        th, td {
+            border: 1px solid #e0e0e0; /* Daha açık bir border */
+            padding: 5px 6px; /* Padding'i biraz daha ayarladık (dikey 5px, yatay 6px) */
+            text-align: left;
+            vertical-align: top; /* Hücre içeriği üste yaslansın */
+            word-wrap: break-word;
+        }
+
+        th {
+            background-color: #f0f4f7; /* Başlık arkaplanını değiştirdik */
+            color: #333;
+            font-weight: bold;
+            font-size: 8.5pt; /* Başlık fontunu içerikle aynı yaptık veya çok az büyük */
+            padding-top: 7px; /* Başlık padding'ini biraz artırdık */
+            padding-bottom: 7px;
+        }
+
+        /* Bilgi tabloları */
+        .info-table th {
+            width: 28%; /* Biraz daralttık */
+            background-color: #f9f9f9;
+            font-weight: bold; /* Etiketleri kalın yaptık */
+        }
+
+        .info-table td {
+            width: 72%;
+        }
+
+        /* Kargo tablosu */
+        .kargo-table {
+            /* box-shadow: none; */
+        }
+
+            .kargo-table th {
+                white-space: normal; /* Başlıklar alt satıra geçebilsin */
+                font-size: 8pt; /* Başlık fontunu küçülttük, içerikle daha uyumlu */
+                padding: 4px 5px; /* Padding'i azalttık */
+            }
+
+            .kargo-table td {
+                font-size: 7.5pt; /* İçerik fontunu biraz daha küçülttük */
+                vertical-align: middle;
+                padding: 4px 5px; /* Padding'i azalttık */
+            }
+
+                .kargo-table td.amount, .kargo-table th.amount {
+                    text-align: right;
+                    white-space: nowrap; /* Sayıların bölünmemesi önemli */
+                }
+
+                /* 6 sütun için daha hassas genişlikler. TOPLAMLARI %100 OLMALI. */
+                /* Bu değerlerle oynayarak tam sığdırmayı deneyin. */
+
+                .kargo-table th:nth-child(1), .kargo-table td:nth-child(1) {
+                    width: 14%;
+                }
+                /* Takip No - Biraz daralttık */
+                .kargo-table th:nth-child(2), .kargo-table td:nth-child(2) {
+                    width: 16%;
+                }
+                /* Alıcı - Biraz daralttık */
+                .kargo-table th:nth-child(3), .kargo-table td:nth-child(3) {
+                    width: 27%;
+                }
+                /* Ödeme Yöntemi - Biraz genişlettik, uzun olabilir */
+                .kargo-table th:nth-child(4), .kargo-table td:nth-child(4) {
+                    width: 13%;
+                }
+                /* Ürün Bedeli (Aktarılan) */
+                .kargo-table th:nth-child(5), .kargo-table td:nth-child(5) {
+                    width: 12%;
+                }
+                /* Hizmet Bedeli (Borç) */
+                .kargo-table th:nth-child(6), .kargo-table td:nth-child(6) {
+                    width: 13%;
+                }
+        /* Net Etki */
+        /* Kontrol: 14 + 22 + 26 + 13 + 12 + 13 = 100% */
+
+
+        .total-row td {
+            font-weight: bold;
+            background-color: #e8eef2; /* Toplam satırı arkaplanı */
+            color: #222;
+            font-size: 9pt;
+            padding-top: 8px;
+            padding-bottom: 8px;
+        }
+
+            .total-row td:first-child {
+                text-align: right;
+            }
+
+        .text-danger {
+            color: #d9534f;
+        }
+        /* Bootstrap danger rengi */
+        .text-success {
+            color: #5cb85c;
+        }
+        /* Bootstrap success rengi */
+
+        .footer {
+            text-align: center;
+            font-size: 7.5pt; /* Biraz daha küçülttük */
+            color: #777;
+            position: fixed;
+            bottom: 0.5cm; /* Sayfa altına olan mesafeyi ayarladık */
+            left: 0; /* Footer'ı tam genişlik yapmak için */
+            right: 0;
+            padding-top: 4px;
+            /* width: 100%; */ /* calc yerine %100 deneyebiliriz, margin'ler etkilemezse */
+        }
+    </style>
+</head>
+<body>
+    {# Logo eklemek isterseniz bu kısmı aktif edip src'yi ayarlayın #}
+    {#
+    <div class="logo-container">
+        <img src="{{ url_for('static', filename='images/sirket_logo.png', _external=True) }}" alt="Şirket Logosu">
+    </div>
+    #}
+
+    <div class="header">
+        <h1>Ödeme/Mahsup Ekstresi</h1>
+        <p>Kargo Takip Sistemi - {{ odeme_kaydi.isletme.isletme_adi if isletme else 'Bilinmeyen İşletme' }}</p>
+    </div>
+
+    {% if odeme_kaydi and isletme %}
+    <table style="width:98%; margin-bottom: 25px;">
+        <tr>
+            <td style="width:49%; border:none; padding:0; vertical-align:top;">
+                <div class="section-title" style="margin-top:0;">İşletme Bilgileri</div>
+                <table class="info-table">
+                    <tr><th>İşletme Adı:</th><td>{{ isletme.isletme_adi }}</td></tr>
+                    <tr><th>İşletme Kodu:</th><td>{{ isletme.isletme_kodu }}</td></tr>
+                    <tr><th>Yetkili Kişi:</th><td>{{ isletme.yetkili_kisi or '-' }}</td></tr>
+                    {# İsteğe bağlı: İşletme adresi, telefonu vb. eklenebilir #}
+                </table>
+            </td>
+            <td style="width:49%; border:none; padding:0; padding-left:15px; vertical-align:top;">
+                <div class="section-title" style="margin-top:0;">Ödeme/Mahsup Bilgileri</div>
+                <table class="info-table">
+                    <tr><th>Ekstre No (Ödeme ID):</th><td>#{{ odeme_kaydi.id }}</td></tr>
+                    <tr><th>Ödeme/Mahsup Tarihi:</th><td>{{ odeme_kaydi.odeme_tarihi.strftime('%d-%m-%Y') }}</td></tr>
+                    <tr>
+                        <th>Net Tutar:</th>
+                        <td class="{% if odeme_kaydi.odenen_tutar < 0 %}text-danger{% elif odeme_kaydi.odenen_tutar > 0 %}text-success{% endif %}" style="font-weight: bold;">
+                            {{ "%.2f"|format(odeme_kaydi.odenen_tutar) }} TL
+                            {% if odeme_kaydi.odenen_tutar < 0 %}(İşletme Borcu){% elif odeme_kaydi.odenen_tutar > 0 %}(İşletmeye Ödeme){% else %}(Mahsup){% endif %}
+                        </td>
+                    </tr>
+                    <tr><th>Açıklama/Referans:</th><td>{{ odeme_kaydi.aciklama or odeme_kaydi.islem_referansi or '-' }}</td></tr>
+                    <tr><th>Ekstre Oluşturma Tarihi:</th><td>{{ now().strftime('%d-%m-%Y %H:%M:%S') }}</td></tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+
+    <div class="section-title">İşleme Dahil Edilen Kargolar</div>
+    {% if iliskili_kargolar_data %}
+    <table class="kargo-table">
+        <thead>
+            <tr>
+                <th>Takip No</th>
+                <th>Alıcı</th>
+                <th>Ödeme Yöntemi</th>
+                <th class="amount">Ürün Bedeli (Aktarılan)</th>
+                <th class="amount">Hizmet Bedeli (Borç)</th>
+                <th class="amount">Bakiye</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for k_data in iliskili_kargolar_data %}
+            <tr>
+                <td>{{ k_data.kargo.takip_numarasi }}</td>
+                <td>{{ k_data.kargo.alici_adi_soyadi }}</td>
+                <td><small>{{ k_data.kargo.odeme_yontemi_teslimde }}</small></td>
+                <td class="amount">{{ "%.2f"|format(k_data.kargo.isletmeye_aktarilacak_tutar if k_data.kargo.odeme_yontemi_teslimde in ["Kapıda Nakit", "Kapıda KK (Kargo POS)"] else 0) }}</td>
+                <td class="amount">{{ "%.2f"|format(k_data.kargo.kargo_ucreti_isletme_borcu) }}</td>
+                <td class="amount {% if k_data.net_etki < 0 %}text-danger{% elif k_data.net_etki > 0 %}text-success{% endif %}">
+                    {{ "%.2f"|format(k_data.net_etki) }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="total-row">
+                {# "Teslim Tarihi" çıktığı için colspan 5 oldu (Takip, Alıcı, Ö.Yöntemi, Ürün, Hizmet) #}
+                <td colspan="5"><strong>TOPLAM NET ETKİ (ÖDEME/MAHSUP TUTARI):</strong></td>
+                <td class="amount {% if odeme_kaydi.odenen_tutar < 0 %}text-danger{% elif odeme_kaydi.odenen_tutar > 0 %}text-success{% endif %}">
+                    <strong>{{ "%.2f"|format(odeme_kaydi.odenen_tutar) }} TL</strong>
+                </td>
+            </tr>
+        </tfoot>
+    </table>
+    {% else %}
+    <p style="text-align:center; color:#777; margin-top:20px;">Bu ödeme/mahsup kaydı ile ilişkilendirilmiş kargo bulunmamaktadır.</p>
+    {% endif %}
+
+    {% else %}
+    <p style="text-align:center; color:red; font-weight:bold; margin-top:30px;">Ekstre bilgileri bulunamadı.</p>
+    {% endif %}
+
+    <div class="footer">
+        Bu belge Kargo Takip Sistemi tarafından {{ now().strftime('%d-%m-%Y %H:%M') }} tarihinde oluşturulmuştur.
+    </div>
+</body>
+</html>

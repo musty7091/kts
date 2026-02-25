@@ -1,0 +1,157 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Kurye Paneli - {{ session.get('kurye_ad_soyad', 'Kurye') }}{% endblock %}
+
+{% block body_class %}courier-dashboard-page{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0 page-main-title">Aktif Görevlerim</h2>
+    </div>
+
+    {% if aktif_kargolar %}
+    <div class="card shadow-sm mb-4">
+        {# Aktif görevler için mb-4 eklendi #}
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover table-sm">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Takip No</th>
+                            <th>Alıcı Adı</th>
+                            <th>Alıcı Adres</th>
+                            <th>Şehir/İlçe</th>
+                            <th>Durum</th>
+                            <th class="text-right">Kapıda Tahsilat (TL)</th>
+                            <th class="text-center">Eylemler</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for kargo in aktif_kargolar %} {# Değişken adı güncellendi #}
+                        <tr>
+                            <td><span class="badge badge-secondary">{{ kargo.takip_numarasi }}</span></td>
+                            <td>{{ kargo.alici_adi_soyadi }}</td>
+                            <td><small>{{ kargo.alici_adres }}</small></td>
+                            <td>{{ kargo.alici_sehir }}{% if kargo.alici_ilce %}/{{ kargo.alici_ilce }}{% endif %}</td>
+                            <td>
+                                <span class="badge
+                                {% if kargo.kargo_durumu.name == 'DAGITIMDA' %}badge-success
+                                {% elif kargo.kargo_durumu.name == 'KARGO_ALINDI_MERKEZDE' %}badge-info
+                                {% elif kargo.kargo_durumu.name == 'KURYE_TESLIM_HAZIR' or kargo.kargo_durumu.name == 'PAKETLENDI' or kargo.kargo_durumu.name == 'HAZIRLANIYOR' %}badge-primary
+                                {% else %}badge-secondary
+                                {% endif %}">
+                                    {{ kargo.kargo_durumu.value }}
+                                </span>
+                            </td>
+                            <td class="text-right font-weight-bold">
+                                {% if kargo.odeme_yontemi_teslimde == 'Kapıda Nakit' or kargo.odeme_yontemi_teslimde == 'Kapıda Kredi Kartı' %}
+                                {{ "%.2f"|format(kargo.toplam_tahsil_edilecek_alici) }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ url_for('bp_courier.shipment_action_by_courier', kargo_id=kargo.id) }}"
+                                   class="btn btn-xs btn-primary"
+                                   title="Kargo Detayları ve Durum Güncelleme">
+                                    <i class="fas fa-dolly-flatbed"></i> İşlem Yap
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info text-center mt-3 mb-4">
+        Şu anda size atanmış aktif bir kargo göreviniz bulunmamaktadır.
+    </div>
+    {% endif %}
+
+    {# YENİ: Tamamlanmış Görevler Bölümü #}
+    <div class="d-flex justify-content-between align-items-center mb-3 mt-5">
+        <h2 class="mb-0 page-main-title">Tamamlanmış Görevlerim (Son 20)</h2>
+    </div>
+
+    {% if tamamlanmis_kargolar %}
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover table-sm">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Takip No</th>
+                            <th>Alıcı Adı</th>
+                            <th>Durum</th>
+                            <th>Teslim/İade Tarihi</th>
+                            <th class="text-center">Eylemler</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for kargo in tamamlanmis_kargolar %}
+                        <tr>
+                            <td><span class="badge badge-secondary">{{ kargo.takip_numarasi }}</span></td>
+                            <td>{{ kargo.alici_adi_soyadi }}</td>
+                            <td>
+                                <span class="badge
+                                {% if kargo.kargo_durumu == KargoDurumEnum.TESLIM_EDILDI %}badge-success
+                                {% elif kargo.kargo_durumu == KargoDurumEnum.IADE_EDILDI_ISLETMEYE %}badge-warning
+                                {% else %}badge-secondary
+                                {% endif %}">
+                                    {{ kargo.kargo_durumu.value }}
+                                </span>
+                            </td>
+                            <td>{{ kargo.guncellenme_tarihi.strftime('%d-%m-%Y %H:%M') if kargo.guncellenme_tarihi else '-' }}</td>
+                            <td class="text-center">
+                                <a href="{{ url_for('bp_courier.shipment_action_by_courier', kargo_id=kargo.id) }}"
+                                   class="btn btn-xs btn-outline-info"
+                                   title="Kargo Detaylarını Görüntüle">
+                                    <i class="fas fa-search"></i> Detay
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-light text-center mt-3 border">
+        Henüz tamamlanmış bir göreviniz bulunmamaktadır.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    .page-main-title {
+        font-size: 1.75rem;
+        font-weight: 500;
+    }
+
+    .table-sm th, .table-sm td {
+        padding: 0.5rem;
+        font-size: 0.82rem;
+        vertical-align: middle;
+    }
+
+    .btn-xs {
+        padding: .2rem .4rem;
+        font-size: .75rem;
+    }
+
+    .table td small {
+        display: block;
+        max-width: 250px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+</style>
+{% endblock %}

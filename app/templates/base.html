@@ -1,0 +1,140 @@
+﻿<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>{% block title %}BeeCargo - Kargo Takip Sistemi{% endblock %}</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    {% if csrf_token %} {# CSRF token için meta etiketi (opsiyonel, eğer kullanıyorsanız) #}
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    {% endif %}
+    {% block head_extra %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+
+    {% block navbar %}
+    {% if 'admin_id' in session or 'isletme_id' in session or 'kurye_id' in session %}
+    {% include "includes/_main_navbar.html" %}
+    {% else %}
+    {% endif %}
+    {% endblock navbar %}
+
+    <main role="main" class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages-container mt-3">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category if category else 'info' }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}
+        {# Sayfaya özel içerik buraya gelecek #}
+        {% endblock %}
+    </main>
+
+    <footer class="container text-center py-4 mt-auto">
+        <p class="mb-0">&copy; {{ now().year if now else "" }} BeeCargo Kargo Takip Sistemi. Tüm hakları saklıdır.</p>
+    </footer>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Bildirim dropdown için script
+        const notificationDropdownTrigger = document.getElementById('navbarDropdownNotificationsUser');
+        if (notificationDropdownTrigger) {
+            const dropdownMenu = notificationDropdownTrigger.nextElementSibling;
+            if (dropdownMenu) {
+                const notificationItems = dropdownMenu.querySelectorAll('a.notification-item');
+                notificationItems.forEach(item => {
+                    item.addEventListener('click', function(event) {
+                        const notificationId = this.dataset.notificationId;
+                        const targetUrl = this.href;
+                        if (notificationId && targetUrl && targetUrl !== '#' && !this.classList.contains('js-notification-clicked')) {
+                            this.classList.add('js-notification-clicked');
+                            event.preventDefault();
+                            const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+                            const csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : null;
+                            let markReadUrl = "{{ url_for('bp_common.mark_notification_read', notification_id=0) }}".replace('0', notificationId);
+                            fetch(markReadUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'Content-Type': 'application/json',
+                                    ...(csrfToken && {'X-CSRFToken': csrfToken})
+                                }
+                            })
+                            .then(response => {
+                                if (!response.ok) {
+                                    return response.text().then(text => {
+                                       console.error('BASE.HTML: Sunucu hata yanıtı (text):', text);
+                                       return Promise.reject(new Error(`Sunucu hatası: ${response.status} - ${text || 'Mesaj yok'}`));
+                                    });
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                if (data.success) {
+                                    this.classList.remove('font-weight-bold');
+                                    let badge = notificationDropdownTrigger.querySelector('.navbar-badge');
+                                    if(badge){
+                                        let currentCountText = badge.textContent;
+                                        let count = parseInt(currentCountText);
+                                        if (!isNaN(count)) {
+                                            count = Math.max(0, count - 1);
+                                            badge.textContent = count;
+                                            if(count === 0) {
+                                                badge.style.display = 'none';
+                                            }
+                                        }
+                                    }
+                                }
+                                window.location.href = targetUrl;
+                            })
+                            .catch(error => {
+                                console.error("BASE.HTML: Bildirim okundu olarak işaretlenirken fetch hatası:", error);
+                                window.location.href = targetUrl;
+                            });
+                        } else if (targetUrl && targetUrl !== '#') {
+                            // Zaten tıklandıysa veya link '#' değilse varsayılan davranış
+                        } else {
+                            event.preventDefault(); // '#' linklerini engelle
+                        }
+                    });
+                });
+            }
+        }
+
+        // Flash mesajları otomatik kapatma script'i
+        const flashMessages = document.querySelectorAll('.flash-messages-container .alert');
+        flashMessages.forEach(function(message) {
+            setTimeout(function() {
+                // Bootstrap'in kendi kapatma metodunu kullanmak daha iyi olabilir.
+                // Bunun için jQuery ve Bootstrap JS'in yüklü olması gerekir.
+                if (window.jQuery && bootstrap && bootstrap.Alert) {
+                     $(message).alert('close');
+                } else {
+                    // Manuel olarak gizle (eğer Bootstrap JS tam yüklenmemişse veya jQuery yoksa)
+                    message.style.transition = 'opacity 0.5s ease';
+                    message.style.opacity = '0';
+                    setTimeout(() => { message.style.display = 'none'; }, 500); // Animasyon bittikten sonra display none yap
+                }
+            }, 5000); // 5000 milisaniye = 5 saniye
+        });
+    });
+    </script>
+    {% block scripts_extra %}{% endblock %}
+</body>
+</html>

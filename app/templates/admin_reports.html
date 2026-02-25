@@ -1,0 +1,170 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Raporlar ve İstatistikler - Admin Paneli{% endblock %}
+{% block body_class %}admin-reports-page{% endblock %}
+
+
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0 page-main-title">Raporlar ve İstatistikler</h2>
+        <a href="{{ url_for('bp_admin.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-tachometer-alt mr-1"></i> Admin Paneline Geri Dön
+        </a>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-filter mr-2"></i>Raporlama Kriterleri</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('bp_admin.reports') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="row">
+                    <div class="col-md-5">
+                        <div class="form-group">
+                            <label for="start_date">Başlangıç Tarihi (*):</label>
+                            <input type="date" class="form-control form-control-sm" id="start_date" name="start_date" value="{{ form_dates.start_date }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="form-group">
+                            <label for="end_date">Bitiş Tarihi (*):</label>
+                            <input type="date" class="form-control form-control-sm" id="end_date" name="end_date" value="{{ form_dates.end_date }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary btn-sm btn-block">
+                            <i class="fas fa-cogs"></i> Raporu Oluştur
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if report_data and (form_dates.start_date and form_dates.end_date) %}
+    {# --- GENEL ÖZET KARTI --- #}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">
+                <i class="fas fa-chart-line mr-2"></i>
+                Genel Özet
+                <span class="text-muted font-weight-normal">(<span class="font-weight-bold">{{ form_dates.start_date }}</span> - <span class="font-weight-bold">{{ form_dates.end_date }}</span>)</span>
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-lg-6 mb-3">
+                    <h6 class="text-secondary mb-3">Genel Kargo İstatistikleri</h6>
+                    <ul class="list-group">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">Toplam Oluşturulan Kargo:<span class="badge badge-primary badge-pill" style="font-size: 1rem;">{{ report_data.get('total_shipments_created', 0) }}</span></li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">Teslim Edilen Kargo:<span class="badge badge-success badge-pill" style="font-size: 1rem;">{{ report_data.get('delivered_shipments_count', 0) }}</span></li>
+                    </ul>
+                </div>
+                <div class="col-lg-6 mb-3">
+                    <h6 class="text-secondary mb-3">Finansal Özet</h6>
+                    <ul class="list-group">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">Kazanılan Toplam Hizmet Bedeli:<span class="badge badge-info badge-pill" style="font-size: 1rem;">{{ "%.2f"|format(report_data.get('total_service_fee_earned', 0)) }} TL</span></li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">İşletmelere Yapılan Ödeme/Mahsup:<span class="badge {% if report_data.get('total_payments_made_to_businesses', 0) >= 0 %}badge-success{% else %}badge-danger{% endif %} badge-pill" style="font-size: 1rem;">{{ "%.2f"|format(report_data.get('total_payments_made_to_businesses', 0)) }} TL</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# --- YENİ: İŞLETME BAZLI RAPOR TABLOSU --- #}
+    {% if report_data.get('isletme_reports') %}
+    <div class="card shadow-sm">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">
+                <i class="fas fa-store mr-2"></i>
+                İşletme Bazlı Performans
+                <span class="text-muted font-weight-normal">(<span class="font-weight-bold">{{ form_dates.start_date }}</span> - <span class="font-weight-bold">{{ form_dates.end_date }}</span>)</span>
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover table-sm">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>İşletme Adı</th>
+                            <th>İşletme Kodu</th>
+                            <th class="text-center">Oluşturulan Kargo</th>
+                            <th class="text-center">Teslim Edilen Kargo</th>
+                            <th class="text-right">Kazanılan Hizmet Bedeli (TL)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for isletme_report in report_data.isletme_reports %}
+                        <tr>
+                            <td>{{ isletme_report.name }}</td>
+                            <td><span class="badge badge-secondary">{{ isletme_report.code }}</span></td>
+                            <td class="text-center">{{ isletme_report.total_created }}</td>
+                            <td class="text-center">{{ isletme_report.total_delivered }}</td>
+                            <td class="text-right font-weight-bold text-info">{{ "%.2f"|format(isletme_report.service_fee) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% elif report_data and not report_data.get('isletme_reports') and (form_dates.start_date and form_dates.end_date) %}
+    <div class="alert alert-info mt-3">
+        Belirtilen tarih aralığı için işletme bazlı raporlanacak veri bulunamadı.
+    </div>
+    {% endif %}
+    {# --- İŞLETME BAZLI RAPOR TABLOSU BİTİŞİ --- #}
+
+    {% elif request.method == 'POST' and not (form_dates.start_date and form_dates.end_date) %}
+    {# Form gönderildi ama tarihler boşsa (Python tarafında flash mesaj veriliyor) #}
+    {% elif not report_data and request.method == 'GET' and not (form_dates.start_date and form_dates.end_date) %}
+    <div class="alert alert-light mt-3 border">
+        Raporu görüntülemek için lütfen yukarıdan bir tarih aralığı seçin ve "Raporu Oluştur" butonuna basın.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    .page-main-title {
+        font-weight: 300;
+        color: #454d55;
+    }
+
+    .card-header h5 {
+        font-weight: 500;
+    }
+
+    .list-group-item {
+        font-size: 0.9rem;
+        padding: .65rem 1.25rem;
+    }
+
+    .badge-pill {
+        padding-right: .8em;
+        padding-left: .8em;
+    }
+
+    .form-control-sm {
+        font-size: 0.875rem;
+    }
+
+    .form-group label {
+        font-size: 0.875rem;
+    }
+
+    .table-sm th, .table-sm td {
+        font-size: 0.8rem;
+    }
+
+    .sticky-top {
+        top: 56px; /* Navbar yüksekliği kadar */
+    }
+    /* Tablo başlığını sabitlemek için (isteğe bağlı) */
+</style>
+{% endblock %}

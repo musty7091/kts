@@ -1,0 +1,115 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Yeni İşletme Ekle - Admin Paneli{% endblock %}
+
+{% block body_class %}admin-dashboard-page{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4 form-page">
+    <div class="card shadow-sm">
+        <div class="card-header bg-success text-white">
+            <h2 class="mb-0 h5">Yeni İşletme Ekle</h2>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('bp_admin.add_business') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="isletme_adi">İşletme Adı (*)</label>
+                            <input type="text" id="isletme_adi" name="isletme_adi" class="form-control" value="{{ form_data.get('isletme_adi', '') }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="isletme_kodu">İşletme Kodu (*)</label>
+                            <input type="text" id="isletme_kodu" name="isletme_kodu" class="form-control" value="{{ form_data.get('isletme_kodu', '') }}" required maxlength="10">
+                            <small class="form-text text-muted">Kargo takip numaraları için benzersiz kısa bir kod (Örn: FEO). En fazla 10 karakter.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="kullanici_adi">Giriş İçin Kullanıcı Adı (*)</label>
+                            <input type="text" id="kullanici_adi" name="kullanici_adi" class="form-control" value="{{ form_data.get('kullanici_adi', '') }}" required>
+                            <small class="form-text text-muted">İşletmenin panele giriş yapacağı kullanıcı adı.</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="sifre">Giriş İçin Şifre (*)</label>
+                            <input type="password" id="sifre" name="sifre" class="form-control" required>
+                            <small class="form-text text-muted">İşletmenin panele giriş yapacağı şifre.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+                <h5 class="mt-3 mb-3 text-muted">İletişim ve Diğer Bilgiler</h5>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="isletme_email">İşletme Email (*)</label>
+                            <input type="email" id="isletme_email" name="isletme_email" class="form-control" value="{{ form_data.get('isletme_email', '') }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="isletme_telefon">İşletme Telefon (*)</label> {# GÜNCELLENDİ #}
+                            <input type="tel" id="isletme_telefon" name="isletme_telefon" class="form-control" value="{{ form_data.get('isletme_telefon', '') }}" required> {# GÜNCELLENDİ #}
+                            <small class="form-text text-muted">Örn: +905xxxxxxxxx</small> {# GÜNCELLENDİ #}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="yetkili_kisi">Yetkili Kişi</label>
+                    <input type="text" id="yetkili_kisi" name="yetkili_kisi" class="form-control" value="{{ form_data.get('yetkili_kisi', '') }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="isletme_adres">İşletme Adres</label>
+                    <textarea id="isletme_adres" name="isletme_adres" class="form-control" rows="3">{{ form_data.get('isletme_adres', '') }}</textarea>
+                </div>
+
+                <hr class="my-4">
+                <p class="text-muted"><small>(*) ile işaretli alanlar zorunludur.</small></p>
+                <div class="form-group text-right">
+                    <a href="{{ url_for('bp_admin.dashboard') }}" class="btn btn-outline-secondary mr-2">
+                        <i class="fas fa-times mr-1"></i> İptal Et
+                    </a>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save mr-1"></i> İşletmeyi Kaydet
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    .card-header h2.h5 {
+        font-size: 1.25rem;
+        font-weight: 500;
+    }
+
+    .form-group label {
+        font-weight: 500;
+    }
+
+    hr.my-4 {
+        margin-top: 1.5rem !important;
+        margin-bottom: 1.5rem !important;
+    }
+
+    h5.text-muted {
+        font-size: 1.1rem;
+    }
+</style>
+{% endblock %}

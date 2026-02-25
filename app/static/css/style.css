@@ -1,0 +1,795 @@
+/* app/static/css/style.css */
+
+/* ==========================================================================
+   Temel HTML ve Body Stilleri
+   ========================================================================== */
+html {
+    overflow-y: scroll;
+    font-size: 16px;
+    height: 100%;
+}
+
+body {
+    /* Standart Navbar Yüksekliði (0.75rem üst padding + 32px logo + 0.75rem alt padding + 1px border)
+       0.75rem = 12px (eðer 1rem = 16px ise)
+       Toplam: 12px + 32px + 12px + 1px = 57px.
+       Fixed navbar için biraz daha boþluk býrakmak (örn: 70px-80px arasý) daha iyi olabilir.
+       Navbar'ýn gerçek yüksekliðini tarayýcýdan ölçüp bu deðeri kesinleþtirin.
+    */
+    padding-top: 78px; /* BU DEÐERÝ NAVBAR YÜKSEKLÝÐÝNÝZE GÖRE DOÐRU AYARLAYIN! */
+    background-color: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.9rem;
+    color: #212529;
+    line-height: 1.6;
+}
+
+main.container {
+    flex-grow: 1;
+    padding-bottom: 2rem;
+    width: 100%;
+}
+
+/* ==========================================================================
+   STANDART NAVBAR STÝLÝ (Tüm Roller ve Public Sayfalar Ýçin Ortak)
+   Kullanýlacak HTML sýnýfý: .main-site-navbar (bkz: _main_navbar.html)
+   ========================================================================== */
+.navbar.main-site-navbar {
+    background-color: #ffffff !important;
+    border-bottom: 1px solid #e0e0e0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04) !important;
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+    font-size: 0.875rem;
+}
+
+    .navbar.main-site-navbar .main-navbar-brand {
+        display: flex;
+        align-items: center;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+
+    .navbar.main-site-navbar .main-navbar-logo {
+        height: 32px;
+        margin-right: 10px;
+    }
+
+    .navbar.main-site-navbar .main-navbar-brand-text {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 700;
+        font-size: 1.4rem;
+        line-height: 1;
+    }
+
+        .navbar.main-site-navbar .main-navbar-brand-text .brand-bee {
+            color: #FFC107;
+        }
+
+        .navbar.main-site-navbar .main-navbar-brand-text .brand-cargo {
+            color: #343a40;
+        }
+
+    .navbar.main-site-navbar .nav-link {
+        color: #343a40 !important;
+        font-weight: 500;
+        font-size: 0.9rem;
+        padding-left: 0.85rem;
+        padding-right: 0.85rem;
+        padding-top: 0.6rem;
+        padding-bottom: 0.6rem;
+    }
+
+        .navbar.main-site-navbar .nav-link.font-weight-bold {
+            font-weight: 700 !important;
+        }
+
+        .navbar.main-site-navbar .nav-link:hover,
+        .navbar.main-site-navbar .navbar-nav .nav-item.active > .nav-link {
+            color: #B8860B !important; /* Koyu Altýn Sarýsý */
+        }
+
+            .navbar.main-site-navbar .navbar-nav .nav-item.active > .nav-link::after {
+                content: '';
+                position: absolute;
+                bottom: 2px;
+                left: 0.85rem;
+                right: 0.85rem;
+                height: 2.5px;
+                background-color: #B8860B !important;
+            }
+
+    .navbar.main-site-navbar .navbar-text {
+        color: #6c757d !important;
+        font-size: 0.85rem;
+        margin-right: 0.75rem !important;
+        display: flex;
+        align-items: center;
+    }
+
+    .navbar.main-site-navbar .dropdown-toggle {
+        display: flex;
+        align-items: center;
+    }
+
+    .navbar.main-site-navbar .user-dropdown-toggle { /* Kullanýcý adý dropdown için özel */
+        font-weight: 500;
+        color: #495057 !important;
+        padding-right: 0.5rem !important;
+        font-size: 0.875rem;
+    }
+
+        .navbar.main-site-navbar .user-dropdown-toggle:hover {
+            color: #B8860B !important;
+        }
+
+    .navbar.main-site-navbar .user-icon {
+        font-size: 1.25rem;
+        color: #495057;
+        margin-top: -1px;
+    }
+
+    .navbar.main-site-navbar .user-name {
+        font-size: 0.85rem;
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: inline-block;
+        vertical-align: middle;
+    }
+
+    .navbar.main-site-navbar .dropdown-menu .fa-fw {
+        opacity: 0.75;
+        width: 1.28571429em;
+    }
+
+    .navbar.main-site-navbar .nav-icon-link .fa-bell { /* Sadece bildirim ikonu */
+        color: #495057;
+        font-size: 1.2rem;
+    }
+
+    .navbar.main-site-navbar .navbar-badge {
+        position: absolute; /* Bootstrap'in .navbar-badge'i zaten pozisyonlu */
+        top: 4px;
+        right: -3px;
+        min-width: 16px;
+        height: 16px;
+        font-size: 0.58rem;
+        /* Diðer .navbar-badge stilleri (renk, border-radius vb.) Bootstrap'ten veya yukarýdaki genel tanýmlardan gelebilir */
+    }
+
+    .navbar.main-site-navbar .navbar-toggler {
+        border-color: rgba(0,0,0,0.1);
+        padding: .25rem .5rem;
+    }
+
+    .navbar.main-site-navbar .navbar-toggler-icon {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%2852, 58, 64, 0.85%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
+    }
+
+    /* Navbar Bildirim Dropdown (Genel stil) */
+    .navbar.main-site-navbar .dropdown-menu {
+        min-width: 300px;
+        font-size: 0.82rem;
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+    }
+
+    .navbar.main-site-navbar .dropdown-item.notification-item {
+        white-space: normal;
+        padding: 0.6rem 1rem;
+        line-height: 1.4;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+        .navbar.main-site-navbar .dropdown-item.notification-item:last-child {
+            border-bottom: none;
+        }
+
+        .navbar.main-site-navbar .dropdown-item.notification-item small.notification-type {
+            display: block;
+            font-weight: 600;
+            color: #007bff;
+            margin-bottom: 3px;
+            font-size: 0.75em;
+        }
+
+        .navbar.main-site-navbar .dropdown-item.notification-item .message-body {
+            display: block;
+            margin-bottom: 4px;
+            color: #333;
+        }
+
+        .navbar.main-site-navbar .dropdown-item.notification-item small.text-muted.d-block.timeago {
+            font-size: 0.75em;
+        }
+
+    .navbar.main-site-navbar .dropdown-menu .dropdown-item.text-center small {
+        font-weight: 500;
+    }
+
+
+/* ==========================================================================
+   Body Padding Ayarlamasý (Sayfa Özel)
+   ========================================================================== */
+body.landing-page,
+body.login-page {
+    padding-top: 0 !important; /* Bu sayfalarda merkezi navbar yok */
+}
+
+/* public_track_input.html artýk _main_navbar.html'i kullanacaðý için,
+   genel body padding-top deðeri (yukarýda ayarlandý) bu sayfa için de geçerli olacak.
+   Özel bir padding-top'a gerek kalmadý.
+*/
+
+/* ==========================================================================
+   Flash Mesajlar
+   ========================================================================== */
+.flash-messages-container {
+    width: 100%;
+    max-width: 960px;
+    margin-left: auto;
+    margin-right: auto;
+    position: relative;
+    z-index: 1050;
+}
+
+/* ==========================================================================
+   Login Sayfalarý Stilleri
+   ========================================================================== */
+body.login-page {
+    /* padding-top:0 !important; zaten yukarýda tanýmlý */
+    background-color: #e9ecef;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+    body.login-page main.container {
+        padding: 20px;
+        width: 100%;
+        max-width: 420px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex-grow: 0;
+    }
+
+    body.login-page .flash-messages-container {
+        width: 100%;
+        max-width: 100%;
+        margin-bottom: 1.5rem;
+        order: -1;
+    }
+
+.login-form-wrapper {
+    background-color: #fff;
+    padding: 2rem 1.5rem;
+    border-radius: 0.3rem;
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.1);
+    width: 100%;
+}
+
+    .login-form-wrapper h2 {
+        font-weight: 600;
+        color: #333;
+    }
+
+    .login-form-wrapper label {
+        font-weight: 500;
+        color: #495057;
+    }
+
+/* ==========================================================================
+   Genel Sayfa Baþlýklarý ve Kart Stilleri
+   ========================================================================== */
+h2.page-main-title {
+    font-size: 1.6rem;
+    margin-bottom: 1.25rem;
+    color: #343a40;
+    font-weight: 500;
+}
+
+.card {
+    margin-bottom: 1.5rem;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.05);
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: .75rem 1.25rem;
+}
+
+    .card-header h2.h5, .card-header h3.h5, .card-header h5 {
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin-bottom: 0;
+    }
+
+/* ==========================================================================
+   Form Stilleri (Genel)
+   ========================================================================== */
+.form-page .card-header h2.h5 {
+    font-size: 1.15rem;
+}
+
+.form-group label {
+    font-weight: 500;
+    margin-bottom: 0.3rem;
+    font-size: 0.85rem;
+}
+
+.form-group small.form-text {
+    font-size: 0.78em;
+}
+
+.form-control-sm {
+    font-size: 0.85rem;
+}
+
+input[readonly].form-control, textarea[readonly].form-control {
+    background-color: #e9ecef;
+    opacity: 1;
+    cursor: not-allowed;
+}
+
+.form-page h5.text-muted {
+    font-size: 1rem;
+    color: #6c757d !important;
+    margin-top: 1.5rem !important;
+    margin-bottom: 1rem !important;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+/* ==========================================================================
+   Tablo Stilleri (Genel)
+   ========================================================================== */
+.table {
+    margin-bottom: 1rem;
+}
+
+    .table thead th {
+        background-color: #e9ecef;
+        font-weight: 600;
+        font-size: 0.82rem;
+        white-space: nowrap;
+        vertical-align: middle;
+        border-bottom-width: 2px;
+        color: #495057;
+    }
+
+    .table td {
+        font-size: 0.8rem;
+        vertical-align: middle;
+    }
+
+.table-sm th, .table-sm td {
+    padding: 0.4rem;
+}
+
+.table .badge {
+    font-size: 0.72em;
+    padding: .3em .5em;
+    font-weight: 500;
+}
+
+.table td .btn-sm, .table td .btn-xs {
+    margin-right: 3px;
+    margin-bottom: 3px;
+    padding: 0.18rem 0.38rem;
+    font-size: 0.72rem;
+}
+
+.btn-xs {
+    padding: 0.15rem 0.3rem !important;
+    font-size: 0.68rem !important;
+}
+
+.table-shipment-list th:nth-child(1), .table-shipment-list td:nth-child(1) {
+    min-width: 100px;
+}
+
+.table-shipment-list th:nth-child(2), .table-shipment-list td:nth-child(2) {
+    min-width: 140px;
+}
+
+.table-shipment-list th:nth-child(5), .table-shipment-list td:nth-child(5) {
+    min-width: 150px;
+    max-width: 180px;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.table-shipment-list th:nth-child(6), .table-shipment-list td:nth-child(6) {
+    min-width: 110px;
+}
+
+.table-shipment-list th:nth-child(7), .table-shipment-list td:nth-child(7) {
+    min-width: 110px;
+}
+
+.table-shipment-list th:nth-child(8), .table-shipment-list td:nth-child(8) {
+    min-width: 85px;
+    text-align: left;
+}
+
+/* ==========================================================================
+   Dashboard Sayfalarý (Admin, Ýþletme, Kurye)
+   ========================================================================== */
+.jumbotron {
+    padding: 1.5rem 1.5rem;
+    margin-bottom: 1.5rem;
+    border-radius: .3rem;
+}
+
+    .jumbotron .display-5 {
+        font-size: 2rem;
+        font-weight: 500;
+    }
+
+    .jumbotron p.lead {
+        font-size: 1rem;
+    }
+
+.admin-dashboard-page .quick-links-header {
+    font-size: 1.2rem;
+    margin-bottom: 0.7rem;
+    font-weight: 500;
+    color: #495057;
+}
+
+.admin-dashboard-page .list-group-item i {
+    margin-right: 0.4rem;
+}
+
+.admin-dashboard-page .list-group-item-action {
+    font-size: 0.85rem;
+    padding: .6rem 1rem;
+}
+
+.admin-dashboard-page .list-group-item-purple {
+    color: #fff;
+    background-color: #6f42c1;
+    border-color: #6f42c1;
+}
+
+    .admin-dashboard-page .list-group-item-purple:hover {
+        color: #fff;
+        background-color: #59369a;
+        border-color: #53328e;
+    }
+
+.business-dashboard-page .card-title.h4 {
+    font-size: 1.05rem;
+    font-weight: 500;
+}
+
+/* ==========================================================================
+   Landing Page Stilleri (landing_page.html)
+   ========================================================================== */
+body.landing-page {
+    /* padding-top:0 !important; yukarýda tanýmlý */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    overflow: hidden;
+    background-color: #f4f7f6;
+    cursor: none;
+    color: #333;
+}
+
+    body.landing-page .cover-container {
+        max-width: 52em;
+        padding: 2rem 1.5rem;
+        width: 100%;
+        position: relative;
+        z-index: 10;
+    }
+
+    body.landing-page .company-brand {
+        margin-bottom: 2rem;
+        animation: fadeInUp 0.6s ease-out 0.1s forwards;
+        opacity: 0;
+    }
+
+        body.landing-page .company-brand h1.brand-title {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 2.8rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 0.25rem;
+        }
+
+        body.landing-page .company-brand .brand-bee {
+            color: #FFC107;
+        }
+
+        body.landing-page .company-brand .brand-cargo {
+            color: #343a40;
+        }
+
+    body.landing-page main.px-3 .lead-text {
+        font-family: 'Poppins', sans-serif;
+        font-size: 1.15rem;
+        font-weight: 400;
+        color: #495057;
+        margin-bottom: 2.5rem;
+        max-width: 550px;
+        margin-left: auto;
+        margin-right: auto;
+        line-height: 1.6;
+        animation: fadeInUp 0.6s ease-out 0.4s forwards;
+        opacity: 0;
+    }
+
+    body.landing-page .btn-landing-group {
+        animation: popIn 0.6s ease-out 0.7s forwards;
+        opacity: 0;
+    }
+
+    body.landing-page .login-buttons-group {
+        margin-bottom: 1rem;
+    }
+
+    body.landing-page .btn {
+        font-family: 'Poppins', sans-serif;
+        font-size: 0.90rem;
+        font-weight: 600;
+        padding: 0.75rem 1.3rem;
+        border-radius: 50px;
+        transition: all 0.2s ease-in-out;
+        min-width: 190px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.07);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        vertical-align: middle;
+        margin: 0.3rem;
+    }
+
+        body.landing-page .btn i {
+            margin-right: 0.5rem;
+        }
+
+    body.landing-page .btn-admin {
+        background-color: #343a40;
+        border-color: #343a40;
+        color: #fff;
+    }
+
+        body.landing-page .btn-admin:hover {
+            background-color: #23272b;
+            border-color: #1d2124;
+            transform: translateY(-2px);
+            box-shadow: 0 7px 14px rgba(50,50,93,.1), 0 3px 6px rgba(0,0,0,.08);
+        }
+
+    body.landing-page .btn-business {
+        background-color: #28a745;
+        border-color: #28a745;
+        color: #fff;
+    }
+
+        body.landing-page .btn-business:hover {
+            background-color: #1e7e34;
+            border-color: #1c7430;
+            transform: translateY(-2px);
+            box-shadow: 0 7px 14px rgba(40,167,69,.2), 0 3px 6px rgba(0,0,0,.08);
+        }
+
+    body.landing-page .btn-courier {
+        background-color: #ffc107;
+        border-color: #ffc107;
+        color: #212529;
+    }
+
+        body.landing-page .btn-courier:hover {
+            background-color: #e0a800;
+            border-color: #d39e00;
+            transform: translateY(-2px);
+            box-shadow: 0 7px 14px rgba(255,193,7,.2), 0 3px 6px rgba(0,0,0,.08);
+        }
+
+    body.landing-page .btn-tracking {
+        background-color: #17a2b8;
+        border-color: #17a2b8;
+        color: #fff;
+    }
+
+        body.landing-page .btn-tracking:hover {
+            background-color: #117a8b;
+            border-color: #10707f;
+            transform: translateY(-2px);
+            box-shadow: 0 7px 14px rgba(23,162,184,.2), 0 3px 6px rgba(0,0,0,.08);
+        }
+
+    body.landing-page ~ footer.container {
+        display: none !important;
+    }
+
+#mouse-bee {
+    position: fixed;
+    width: 35px;
+    height: 35px;
+    background-image: url("../images/bee.png");
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center center;
+    pointer-events: none;
+    z-index: 9999;
+    will-change: left, top;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(25px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes popIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.85);
+    }
+
+    80% {
+        transform: scale(1.03);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ==========================================================================
+   Public Kargo Takip Sayfasý (Artýk standart navbar'ý kullanýyor)
+   ========================================================================== */
+.public-tracking-page .card-header { /* Sadece kart baþlýðý için özel stil kaldý */
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    background-color: #FFC107 !important;
+    color: #212529 !important;
+    border-bottom: none !important;
+}
+
+    .public-tracking-page .card-header h3.h4 {
+        font-weight: bold !important;
+    }
+
+.public-tracking-page .form-control-lg {
+    font-size: 1.1rem;
+}
+
+.public-tracking-page .btn-primary { /* Sorgula butonu */
+    background-color: #343a40 !important;
+    border-color: #343a40 !important;
+}
+
+    .public-tracking-page .btn-primary:hover {
+        background-color: #23272b !important;
+        border-color: #1d2124 !important;
+    }
+
+/* ==========================================================================
+   Diðer Sayfalara Özel Stiller
+   ========================================================================== */
+#odenen_tutar_display {
+    font-weight: bold;
+}
+
+.kargo-checkbox {
+    transform: scale(1.2);
+}
+
+.update-status-page .alert-light.border dt {
+    font-weight: 500;
+}
+
+.update-status-page .form-control-lg {
+    font-size: 1.1rem;
+}
+
+.shipment-details-page dl.row dt {
+    font-weight: 500;
+    color: #555;
+}
+
+.shipment-details-page dl.row dd {
+    color: #333;
+    margin-bottom: .5rem;
+}
+
+@media (min-width: 768px) {
+    .shipment-details-page .text-md-right {
+        text-align: right !important;
+    }
+}
+
+.shipment-details-page hr.my-2, .shipment-details-page hr.my-3 {
+    border-top: 1px solid rgba(0,0,0,.1);
+}
+
+.notification-list-item {
+    border-bottom: 1px solid #eee;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+    .notification-list-item:last-child {
+        border-bottom: none;
+    }
+
+    .notification-list-item.unread {
+        background-color: #f8f9fa;
+        font-weight: bold;
+    }
+
+    .notification-list-item .message {
+        font-size: 0.95rem;
+    }
+
+    .notification-list-item .timestamp {
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+
+    .notification-list-item .notification-type {
+        font-size: 0.8rem;
+        color: #007bff;
+        font-weight: normal;
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+
+.pagination-container {
+    margin-top: 2rem;
+    display: flex;
+    justify-content: center;
+}
+
+#passwordHelpBlock ul {
+    padding-left: 20px;
+    margin-bottom: 0;
+    font-size: 0.9em;
+}
+
+#passwordHelpBlock li {
+    margin-bottom: 0.25rem;
+}
+
+/* ==========================================================================
+   Footer
+   ========================================================================== */
+footer.container {
+    text-align: center;
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+    color: #6c757d;
+    font-size: 0.85em;
+    border-top: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+    margin-top: auto;
+}
+
+/* ==========================================================================
+   Yardýmcý Sýnýflar
+   ========================================================================== */
+.font-weight-600 {
+    font-weight: 600 !important;
+}

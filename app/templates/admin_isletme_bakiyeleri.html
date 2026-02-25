@@ -1,0 +1,124 @@
+﻿{% extends "base.html" %}
+
+{% block title %}İşletme Bakiyeleri - Admin Paneli{% endblock %}
+
+
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">İşletme Bakiyeleri ve Ödeme Yönetimi</h2>
+        <a href="{{ url_for('bp_admin.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-tachometer-alt mr-1"></i> Admin Paneline Geri Dön
+        </a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-info text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3 class="mb-0 h5">İşletme Cari Hesapları</h3>
+                {# --- İŞLETME BAKİYE ARAMA FORMU BAŞLANGICI --- #}
+                <form method="GET" action="{{ url_for('bp_admin.isletme_bakiyeleri') }}" class="form-inline">
+                    <div class="input-group input-group-sm">
+                        <input type="text" name="q_bakiye_isletme" class="form-control" placeholder="İşletme Adı/Kodu Ara" value="{{ request.args.get('q_bakiye_isletme', '') }}">
+                        <div class="input-group-append">
+                            <button class="btn btn-light btn-outline-secondary" type="submit"><i class="fas fa-search"></i></button> {# Buton rengi header'a uygun #}
+                        </div>
+                    </div>
+                    {% if request.args.get('q_bakiye_isletme') %}
+                    <a href="{{ url_for('bp_admin.isletme_bakiyeleri') }}" class="btn btn-sm btn-warning ml-2" title="Filtreyi Temizle"><i class="fas fa-times"></i></a>
+                    {% endif %}
+                </form>
+                {# --- İŞLETME BAKİYE ARAMA FORMU BİTİŞİ --- #}
+            </div>
+        </div>
+        <div class="card-body">
+            {% if isletme_verileri %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover table-bordered">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>İşletme Adı</th>
+                            <th>İşletme Kodu</th>
+                            <th class="text-right">Net Bakiye (TL)</th>
+                            <th class="text-center">Eylemler</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for veri in isletme_verileri %}
+                        <tr>
+                            <td>{{ veri.isletme.isletme_adi }}</td>
+                            <td><span class="badge badge-pill badge-dark">{{ veri.isletme.isletme_kodu }}</span></td>
+                            <td class="text-right font-weight-bold {% if veri.toplam_alacak_veya_borc < 0 %}text-danger{% elif veri.toplam_alacak_veya_borc > 0 %}text-success{% else %}text-muted{% endif %}">
+                                {{ "%.2f"|format(veri.toplam_alacak_veya_borc) }}
+                                {% if veri.toplam_alacak_veya_borc < 0 %}<span class="badge badge-danger ml-1">Borçlu</span>
+                                {% elif veri.toplam_alacak_veya_borc > 0 %}<span class="badge badge-success ml-1">Alacaklı</span>
+                                {% else %}<span class="badge badge-secondary ml-1">Sıfır</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ url_for('bp_admin.record_payment', isletme_id=veri.isletme.id) }}" class="btn btn-sm btn-primary mr-1" title="Ödeme/Mahsup Kaydet">
+                                    <i class="fas fa-hand-holding-usd"></i> Ödeme/Mahsup
+                                </a>
+                                <a href="{{ url_for('bp_admin.business_payment_history', isletme_id=veri.isletme.id) }}" class="btn btn-sm btn-outline-secondary" title="Ödeme Geçmişi">
+                                    <i class="fas fa-history"></i> Geçmiş
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                {% if request.args.get('q_bakiye_isletme') %}
+                Aradığınız kriterlere uygun işletme bakiyesi bulunamadı.
+                {% else %}
+                Sistemde kayıtlı aktif işletme bulunmamaktadır veya işletmelerin görüntülenecek bakiye bilgisi yoktur.
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    /* ... (mevcut diğer stil tanımlamalarınız kalabilir) ... */
+    .card-header .form-inline .form-control {
+        width: auto;
+    }
+
+    .table thead th {
+        background-color: #e9ecef;
+        font-weight: 600;
+        font-size: 0.85rem; /* Boyutları diğerleriyle tutarlı hale getirelim */
+    }
+
+    .table td {
+        font-size: 0.8rem; /* Boyutları diğerleriyle tutarlı hale getirelim */
+        vertical-align: middle;
+    }
+
+        .table td .btn-sm {
+            padding: 0.2rem 0.4rem; /* Buton iç boşluğu */
+            font-size: 0.75rem; /* Buton yazı boyutu */
+        }
+
+    .badge {
+        font-size: 0.75em;
+        padding: .3em .5em;
+    }
+
+    .card-header h3.h5 { /* card-header içindeki h3.h5 için */
+        font-size: 1.15rem;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
+{% block scripts_extra %}
+    {# Bu sayfaya özel JavaScript (varsa) #}
+{% endblock %}

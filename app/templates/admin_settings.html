@@ -1,0 +1,128 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Genel Ayarlar ve Şifre - Admin Paneli{% endblock %}
+
+{# Navbar base.html'den gelecek #}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0 page-main-title">Yönetim Paneli Ayarları</h2>
+        <a href="{{ url_for('bp_admin.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-tachometer-alt mr-1"></i> Admin Paneline Geri Dön
+        </a>
+    </div>
+
+    {# --- SİSTEM AYARLARI FORMU (MEVCUT KISIM) --- #}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h3 class="mb-0 h5">Genel Sistem Ayarları</h3>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('bp_admin.settings') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="update_system_settings"> {# Hangi form olduğunu belirt #}
+
+                {% set kargo_ucret_ayari = ayarlar.get('sabit_kargo_hizmet_bedeli') %}
+                {% if kargo_ucret_ayari %}
+                <div class="form-group row">
+                    <label for="sabit_kargo_hizmet_bedeli" class="col-sm-5 col-form-label">{{ kargo_ucret_ayari.aciklama or 'Sabit Kargo Hizmet Bedeli (TL)' }}:</label>
+                    <div class="col-sm-7">
+                        <input type="text" id="sabit_kargo_hizmet_bedeli" name="sabit_kargo_hizmet_bedeli" class="form-control" value="{{ request.form.get('sabit_kargo_hizmet_bedeli', kargo_ucret_ayari.ayar_degeri) }}">
+                        <small class="form-text text-muted">Örn: 100.00 (Ondalık ayıracı olarak nokta kullanın)</small>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-warning"><strong>Uyarı:</strong> 'sabit_kargo_hizmet_bedeli' ayarı veritabanında bulunamadı. Lütfen <code>flask init-data</code> komutunu çalıştırın.</div>
+                {% endif %}
+
+                {# Diğer sistem ayarları buraya eklenebilir #}
+
+                {% if kargo_ucret_ayari %} {# Veya diğer ayarlar varsa #}
+                <hr class="my-4">
+                <div class="form-group row">
+                    <div class="col-sm-7 offset-sm-5 text-right">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save mr-1"></i> Sistem Ayarlarını Kaydet
+                        </button>
+                    </div>
+                </div>
+                {% elif not kargo_ucret_ayari %}
+                <div class="alert alert-danger mt-3">Gösterilecek veya güncellenecek sistem ayarı bulunamadı.</div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    {# --- ADMİN ŞİFRE DEĞİŞTİRME FORMU (YENİ KISIM) --- #}
+    <div class="card shadow-sm">
+        <div class="card-header bg-warning text-dark">
+            {# Farklı bir başlık rengi #}
+            <h3 class="mb-0 h5">Admin Şifresini Değiştir</h3>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('bp_admin.settings') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="change_admin_password"> {# Hangi form olduğunu belirt #}
+
+                <div class="form-group row">
+                    <label for="current_password" class="col-sm-4 col-form-label">Mevcut Şifreniz (*)</label>
+                    <div class="col-sm-8">
+                        <input type="password" id="current_password" name="current_password" class="form-control"
+                               value="{{ password_form_data.get('current_password', '') }}" required>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label for="new_password" class="col-sm-4 col-form-label">Yeni Şifre (*)</label>
+                    <div class="col-sm-8">
+                        <input type="password" id="new_password" name="new_password" class="form-control" required>
+                        <small class="form-text text-muted">En az 8 karakter olmalıdır. (Diğer kriterler eklenebilir)</small>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label for="confirm_new_password" class="col-sm-4 col-form-label">Yeni Şifre (Tekrar) (*)</label>
+                    <div class="col-sm-8">
+                        <input type="password" id="confirm_new_password" name="confirm_new_password" class="form-control" required>
+                    </div>
+                </div>
+                <hr class="my-4">
+                <p class="text-muted"><small>(*) ile işaretli alanlar zorunludur.</small></p>
+                <div class="form-group row">
+                    <div class="col-sm-8 offset-sm-4 text-right">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-key mr-1"></i> Admin Şifresini Güncelle
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    .page-main-title { /* Sayfa ana başlığı için */
+        font-size: 1.75rem;
+        font-weight: 500;
+        color: #343a40;
+    }
+
+    .card-header h3.h5 {
+        font-size: 1.15rem;
+        font-weight: 500;
+    }
+
+    .form-group label.col-form-label { /* Form etiketleri için */
+        font-weight: 500;
+        font-size: 0.9rem; /* Biraz daha kompakt */
+    }
+
+    hr.my-4 {
+        margin-top: 1.5rem !important;
+        margin-bottom: 1.5rem !important;
+    }
+</style>
+{% endblock %}

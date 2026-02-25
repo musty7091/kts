@@ -1,0 +1,33 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Kurye Girişi - Bee Cargo{% endblock %}
+
+{% block navbar %}
+    {# Bu sayfada navbar göstermeyelim veya çok basit bir tane #}
+{% endblock %}
+
+{% block body_class %}login-page{% endblock %} {# style.css'deki login-page stilini kullanır #}
+
+{% block content %}
+<div class="login-form-wrapper">
+    <div class="text-center mb-4">
+        <img src="{{ url_for('static', filename='images/bee.png') }}" alt="BeeCargo Logo" style="height: 50px;">
+        <h2 class="mt-2">Kurye Girişi</h2>
+    </div>
+    <form method="POST" action="{{ url_for('bp_courier.login') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+            <label for="kullanici_adi">Kullanıcı Adı:</label>
+            <input type="text" id="kullanici_adi" name="kullanici_adi" class="form-control" required value="{{ request.form.get('kullanici_adi', '') }}" autofocus>
+        </div>
+        <div class="form-group">
+            <label for="sifre">Şifre:</label>
+            <input type="password" id="sifre" name="sifre" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-warning btn-block mt-4 font-weight-bold">Giriş Yap</button> {# Kurye için farklı renk #}
+    </form>
+    <div class="text-center mt-3">
+        <a href="{{ url_for('bp_common.index') }}">Ana Sayfaya Dön</a>
+    </div>
+</div>
+{% endblock %}

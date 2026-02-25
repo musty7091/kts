@@ -1,0 +1,87 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Kargo Durum Güncelle: {{ kargo.takip_numarasi if kargo else '' }} - İşletme Paneli{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Kargo Durumunu Güncelle</h2>
+        <a href="{{ url_for('bp_business.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-tachometer-alt mr-1"></i> İşletme Paneline Geri Dön
+        </a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h3 class="mb-0 h5">Kargo Bilgileri</h3>
+        </div>
+        <div class="card-body">
+            {% if kargo %}
+            <div class="alert alert-light border">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Takip No:</dt>
+                    <dd class="col-sm-8"><span class="badge badge-pill badge-secondary">{{ kargo.takip_numarasi }}</span></dd>
+                    <dt class="col-sm-4">Alıcı:</dt>
+                    <dd class="col-sm-8">{{ kargo.alici_adi_soyadi }}</dd>
+                    <dt class="col-sm-4">Mevcut Durum:</dt>
+                    <dd class="col-sm-8"><span class="badge badge-info">{{ kargo.kargo_durumu.value }}</span></dd>
+                </dl>
+            </div>
+
+            {% if can_update_by_business and guncellenebilir_durumlar %}
+            <form method="POST" action="{{ url_for('bp_business.update_shipment_status', kargo_id=kargo.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-group mt-3">
+                    <label for="yeni_kargo_durumu"><strong>Yeni Kargo Durumu Seçin (*)</strong></label>
+                    <select id="yeni_kargo_durumu" name="yeni_kargo_durumu" class="form-control form-control-lg" required>
+                        <option value="" disabled selected>Lütfen bir durum seçin...</option>
+                        {# guncellenebilir_durumlar listesi (artık gecerli_sonraki_durumlar_isletme) Enum üyelerini içeriyor #}
+                        {% for durum_secenek in guncellenebilir_durumlar %}
+                        <option value="{{ durum_secenek.value }}"
+                                {% if request.form.get('yeni_kargo_durumu')==durum_secenek.value %}selected{% endif %}>
+                            {{ durum_secenek.value }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">Kargonun bir sonraki geçerli durumunu listeden seçin.</small>
+                </div>
+                <div class="text-right mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-check-circle mr-1"></i> Durumu Kaydet
+                    </button>
+                </div>
+            </form>
+            {% else %}
+            <div class="alert alert-warning mt-3">
+                Bu kargonun (Mevcut Durum: {{ kargo.kargo_durumu.value }}) durumu işletme tarafından şu anda değiştirilemez veya güncellenecek bir sonraki durum bulunmamaktadır.
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="alert alert-danger">Kargo bilgileri bulunamadı.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    .card-header h3.h5 {
+        font-size: 1.25rem;
+        font-weight: 500;
+    }
+
+    h2.mb-0 {
+        font-size: 1.75rem;
+    }
+
+    .alert-light.border dt {
+        font-weight: 500;
+    }
+
+    .form-control-lg {
+        font-size: 1.1rem;
+    }
+</style>
+{% endblock %}

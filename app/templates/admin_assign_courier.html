@@ -1,0 +1,98 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Kargoya Kurye Ata/Değiştir - {{ kargo.takip_numarasi }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Kargoya Kurye Ata/Değiştir</h2>
+        <a href="{{ url_for('bp_admin.shipment_details', kargo_id=kargo.id) }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left mr-1"></i> Kargo Detaylarına Geri Dön
+        </a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-info text-white">
+            <h3 class="mb-0 h5">Kargo Bilgileri</h3>
+        </div>
+        <div class="card-body">
+            <dl class="row">
+                <dt class="col-sm-3">Takip Numarası:</dt>
+                <dd class="col-sm-9"><span class="badge badge-secondary">{{ kargo.takip_numarasi }}</span></dd>
+
+                <dt class="col-sm-3">Alıcı:</dt>
+                <dd class="col-sm-9">{{ kargo.alici_adi_soyadi }}</dd>
+
+                <dt class="col-sm-3">Adres:</dt>
+                <dd class="col-sm-9">{{ kargo.alici_adres }}, {{ kargo.alici_ilce if kargo.alici_ilce else '' }} / {{ kargo.alici_sehir }}</dd>
+
+                <dt class="col-sm-3">Mevcut Durum:</dt>
+                <dd class="col-sm-9"><span class="badge badge-primary">{{ kargo.kargo_durumu.value }}</span></dd>
+
+                <dt class="col-sm-3">Atanmış Kurye:</dt>
+                <dd class="col-sm-9">
+                    {% if kargo.atanan_kurye %}
+                    <strong>{{ kargo.atanan_kurye.ad_soyad }}</strong> (Kullanıcı Adı: {{ kargo.atanan_kurye.kullanici_adi }})
+                    {% else %}
+                    <span class="text-muted">Henüz kurye atanmamış.</span>
+                    {% endif %}
+                </dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mt-4">
+        <div class="card-header">
+            <h3 class="mb-0 h5">Kurye Seçimi</h3>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('bp_admin.assign_courier', kargo_id=kargo.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-group">
+                    <label for="kurye_id"><strong>Aktif Kuryeler:</strong></label>
+                    <select name="kurye_id" id="kurye_id" class="form-control form-control-lg" required>
+                        <option value="" {% if not kargo.kurye_id %}selected{% endif %}>--- Kurye Seçiniz ---</option>
+                        {% if kuryeler %}
+                        {% for kurye_item in kuryeler %}
+                        <option value="{{ kurye_item.id }}" {% if kargo.kurye_id==kurye_item.id %}selected{% endif %}>
+                            {{ kurye_item.ad_soyad }} (ID: {{ kurye_item.id }})
+                        </option>
+                        {% endfor %}
+                        {% else %}
+                        <option value="" disabled>Sistemde aktif kurye bulunmamaktadır.</option>
+                        {% endif %}
+                        <option value="0" class="text-danger font-weight-bold" {% if not kargo.kurye_id and not kuryeler %}disabled{% endif %}>--- Kuryeyi Kaldır ---</option>
+                    </select>
+                    <small class="form-text text-muted">
+                        Kargoyu bu kuryeye atamak için listeden seçin. Mevcut atamayı kaldırmak için "Kuryeyi Kaldır" seçeneğini seçebilirsiniz.
+                    </small>
+                </div>
+
+                <div class="mt-4 text-right">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-user-check mr-1"></i> Kuryeyi Ata/Güncelle
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    .card-header h3.h5 {
+        font-size: 1.15rem;
+        font-weight: 500;
+    }
+
+    dl.row dt {
+        font-weight: 500;
+    }
+
+    .form-control-lg {
+        font-size: 1.1rem;
+    }
+</style>
+{% endblock %}

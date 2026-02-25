@@ -1,0 +1,181 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Kargo Detayları: {{ kargo.takip_numarasi if kargo else 'Bulunamadı' }} - Kargo Takip Sistemi{% endblock %}
+
+{% block body_class %}shipment-details-page{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    {% if 'admin_id' in session %}
+    {% set back_url = url_for('bp_admin.all_shipments') %}
+    {% set back_text = 'Tüm Kargolar Listesine Geri Dön' %}
+    {% elif 'isletme_id' in session %}
+    {% set back_url = url_for('bp_business.dashboard') %}
+    {% set back_text = 'İşletme Paneline Geri Dön' %}
+    {% elif 'kurye_id' in session %}
+    {% set back_url = url_for('bp_courier.dashboard') %}
+    {% set back_text = 'Kurye Paneline Geri Dön' %}
+    {% else %}
+    {% set back_url = url_for('bp_common.index') %}
+    {% set back_text = 'Ana Sayfaya Geri Dön' %}
+    {% endif %}
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left mr-1"></i> {{ back_text }}
+        </a>
+        <div>
+            {# Butonları bir div içine alarak sağa yasladık #}
+            {% if kargo and 'admin_id' in session %}
+            {# Kurye Atama/Değiştirme Butonu - Sadece Admin için ve uygun durumlarda #}
+            {% set non_assignable_final_statuses = [
+            KargoDurumEnum.TESLIM_EDILDI,
+            KargoDurumEnum.IADE_EDILDI_ISLETMEYE,
+            KargoDurumEnum.IPTAL_EDILDI_ADMIN,
+            KargoDurumEnum.IPTAL_EDILDI_ISLETME
+            ] %}
+            {% if kargo.kargo_durumu not in non_assignable_final_statuses %}
+            <a href="{{ url_for('bp_admin.assign_courier', kargo_id=kargo.id) }}" class="btn btn-success btn-sm mr-2">
+                <i class="fas fa-user-plus mr-1"></i> Kurye Ata/Değiştir
+            </a>
+            {% endif %}
+            {% endif %}
+            {% if kargo %}
+            <a href="{{ url_for('bp_common.generate_shipment_pdf', kargo_id=kargo.id) }}" class="btn btn-danger btn-sm" target="_blank">
+                <i class="fas fa-file-pdf mr-1"></i> PDF Görüntüle/İndir
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if kargo %}
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h2 class="mb-0 h5">Kargo Detayları</h2>
+        </div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-12 text-center">
+                    <h4 class="mb-2">Takip Numarası: {{ kargo.takip_numarasi }}</h4>
+                    <img src="{{ url_for('bp_common.generate_barcode_img_route', data_to_encode=kargo.takip_numarasi) }}"
+                         alt="Barkod: {{ kargo.takip_numarasi }}"
+                         style="height: 70px; max-width: 100%; display: block; margin-left: auto; margin-right: auto;">
+                </div>
+            </div>
+            <hr class="my-3">
+            <div class="row">
+                <div class="col-lg-6">
+                    <h5 class="text-muted mb-3 mt-2">Gönderi Bilgileri</h5>
+                    <dl class="row">
+                        <dt class="col-sm-5">Kargo Durumu:</dt>
+                        <dd class="col-sm-7">
+                            <span class="badge
+                            {% if kargo.kargo_durumu.name == 'TESLIM_EDILDI' %}badge-success
+                            {% elif kargo.kargo_durumu.name in ['HAZIRLANIYOR', 'PAKETLENDI'] %}badge-warning
+                            {% elif kargo.kargo_durumu.name.startswith('IPTAL') or kargo.kargo_durumu.name.startswith('IADE') %}badge-danger
+                            {% else %}badge-info
+                            {% endif %}">{{ kargo.kargo_durumu.value }}</span>
+                        </dd>
+
+                        {# YENİ: Atanmış Kurye Bilgisi #}
+                        <dt class="col-sm-5">Atanmış Kurye:</dt>
+                        <dd class="col-sm-7">
+                            {% if kargo.atanan_kurye %}
+                            {{ kargo.atanan_kurye.ad_soyad }}
+                            {% else %}
+                            <span class="text-muted font-italic">Yok</span>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-5">Oluşturulma Tarihi:</dt>
+                        <dd class="col-sm-7">{{ kargo.olusturulma_tarihi.strftime('%d-%m-%Y %H:%M') }}</dd>
+                        <dt class="col-sm-5">Teslim Tarihi:</dt>
+                        <dd class="col-sm-7">{{ kargo.teslim_tarihi.strftime('%d-%m-%Y %H:%M') if kargo.teslim_tarihi else '-' }}</dd>
+                        {% if 'admin_id' in session or 'kurye_id' in session %}
+                        <dt class="col-sm-5">Gönderen İşletme:</dt>
+                        <dd class="col-sm-7">{{ kargo.isletme.isletme_adi }} <small class="text-muted">({{ kargo.isletme.isletme_kodu }})</small></dd>
+                        {% endif %}
+                        <dt class="col-sm-5">Özel Not:</dt>
+                        <dd class="col-sm-7">{{ kargo.ozel_not or '-' }}</dd>
+                    </dl>
+                </div>
+                <div class="col-lg-6">
+                    <h5 class="text-muted mb-3 mt-2">Alıcı Bilgileri</h5>
+                    <dl class="row">
+                        <dt class="col-sm-5">Alıcı Adı Soyadı:</dt>
+                        <dd class="col-sm-7">{{ kargo.alici_adi_soyadi }}</dd>
+                        <dt class="col-sm-5">Alıcı Telefon:</dt>
+                        <dd class="col-sm-7">{{ kargo.alici_telefon }}</dd>
+                        {% if kargo.alici_email %}
+                        <dt class="col-sm-5">Alıcı E-posta:</dt>
+                        <dd class="col-sm-7">{{ kargo.alici_email }}</dd>
+                        {% endif %}
+                        <dt class="col-sm-5">Alıcı Şehir/İlçe:</dt>
+                        <dd class="col-sm-7">{{ kargo.alici_sehir }}{% if kargo.alici_ilce %} - {{ kargo.alici_ilce }}{% endif %}</dd>
+                        <dt class="col-sm-12">Alıcı Açık Adres:</dt>
+                        <dd class="col-sm-12">{{ kargo.alici_adres }}</dd>
+                    </dl>
+                </div>
+            </div>
+
+            {% if kargo.alici_gecici_enlem and kargo.alici_gecici_boylam %}
+            <hr class="my-3">
+            <div class="row">
+                <div class="col-lg-12">
+                    <h5 class="text-info mb-3 mt-2"><i class="fas fa-map-pin mr-2"></i>Alıcının Paylaştığı Geçici Teslimat Konumu {% if kargo.kargo_durumu.name != 'DAGITIMDA' %}<small class="text-muted">(Kargo Dağıtımda Değil)</small>{% endif %}</h5>
+                    <dl class="row">
+                        <dt class="col-sm-4">Paylaşım Zamanı:</dt>
+                        <dd class="col-sm-8">{{ kargo.alici_gecici_konum_zamani.strftime('%d-%m-%Y %H:%M') if kargo.alici_gecici_konum_zamani else 'Bilinmiyor' }}</dd>
+
+                        <dt class="col-sm-4">Google Maps Linki:</dt>
+                        <dd class="col-sm-8">
+                            <a href="https://www.google.com/maps?q={{ kargo.alici_gecici_enlem }},{{ kargo.alici_gecici_boylam }}" target="_blank" class="btn btn-sm btn-success">
+                                <i class="fas fa-directions mr-1"></i> Konuma Git
+                            </a>
+                        </dd>
+                        <dt class="col-sm-4">Koordinatlar:</dt>
+                        <dd class="col-sm-8"><small>Enlem: {{ kargo.alici_gecici_enlem }}, Boylam: {{ kargo.alici_gecici_boylam }}</small></dd>
+                    </dl>
+                </div>
+            </div>
+            {% endif %}
+
+            <hr class="my-3">
+            <div class="row">
+                <div class="col-lg-12">
+                    <h5 class="text-muted mb-3 mt-2">Finansal Bilgiler</h5>
+                    <dl class="row">
+                        <dt class="col-sm-5 col-md-4">Ürün Bedeli (Alıcıdan Tahsil):</dt>
+                        <dd class="col-sm-7 col-md-8 text-md-right">{{ "%.2f"|format(kargo.urun_bedeli_alici_tahsil) }} TL</dd>
+                        <dt class="col-sm-5 col-md-4">Kargo Ücreti (Alıcıdan Tahsil):</dt>
+                        <dd class="col-sm-7 col-md-8 text-md-right">{{ "%.2f"|format(kargo.kargo_ucreti_alici_tahsil) }} TL</dd>
+                        <dt class="col-sm-5 col-md-4"><strong>Toplam Tahsil Edilecek (Alıcıdan):</strong></dt>
+                        <dd class="col-sm-7 col-md-8 text-md-right"><strong>{{ "%.2f"|format(kargo.toplam_tahsil_edilecek_alici) }} TL</strong></dd>
+                        <dt class="col-sm-12"><hr class="my-2"></dt>
+                        <dt class="col-sm-5 col-md-4">Kargo Hizmet Bedeli (İşletmeye):</dt>
+                        <dd class="col-sm-7 col-md-8 text-md-right">{{ "%.2f"|format(kargo.kargo_ucreti_isletme_borcu) }} TL</dd>
+                        <dt class="col-sm-5 col-md-4">İşletmeye Aktarılacak Tutar:</dt>
+                        <dd class="col-sm-7 col-md-8 text-md-right">{{ "%.2f"|format(kargo.isletmeye_aktarilacak_tutar) }} TL</dd>
+                        <dt class="col-sm-12"><hr class="my-2"></dt>
+                        <dt class="col-sm-5 col-md-4">Ödeme Yöntemi (Teslimde):</dt>
+                        <dd class="col-sm-7 col-md-8">{{ kargo.odeme_yontemi_teslimde or '-' }}</dd>
+                        <dt class="col-sm-5 col-md-4">Alıcı Ödeme Durumu:</dt>
+                        <dd class="col-sm-7 col-md-8">{{ kargo.odeme_durumu_alici }}</dd>
+                        <dt class="col-sm-5 col-md-4">İşletmeye Ödendi Mi?:</dt>
+                        <dd class="col-sm-7 col-md-8">{% if kargo.isletmeye_aktarildi_mi %}<span class="badge badge-success">Evet</span>{% else %}<span class="badge badge-warning">Hayır</span>{% endif %}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-danger text-center" role="alert">
+        Kargo detayları bulunamadı veya bu kargoyu görüntüleme yetkiniz yok.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+{% endblock %}

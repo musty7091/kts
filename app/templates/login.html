@@ -1,0 +1,46 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Yönetici Girişi - Kargo Takip Sistemi{% endblock %}
+
+{% block navbar %}
+    {# Bu sayfada genel bir navbar görünmeyecek. #}
+{% endblock %}
+
+{% block head_extra %}
+    {# body.login-page class'ını base.html'de dinamik olarak eklemek daha iyi olabilir,
+       veya base.html'deki body'ye genel bir class verip,
+       style.css'de .login-page body {} gibi bir seçici kullanmak.
+       Şimdilik, bu sayfaya özel body stilini style.css'de .login-page class'ı ile tanımladık.
+       Bu class'ı body'ye eklemek için base.html'de bir değişiklik gerekebilir:
+<body class="{% block body_class %}{% endblock %}">
+    Ve login.html'de:
+    {% block body_class %}login-page{% endblock %}
+    #}
+    <script>
+        // Sayfa yüklendiğinde body'e class ekle (geçici çözüm)
+        document.addEventListener('DOMContentLoaded', function() {
+            document.body.classList.add('login-page');
+        });
+    </script>
+    {% endblock %}
+
+    {% block content %}
+    <div class="login-form-wrapper">
+        <h2 class="text-center mb-4">Yönetici Girişi</h2>
+        <form method="POST" action="{{ url_for('bp_admin.login') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label for="kullanici_adi">Kullanıcı Adı:</label>
+                <input type="text" id="kullanici_adi" name="kullanici_adi" class="form-control" required value="{{ request.form.get('kullanici_adi', '') }}">
+            </div>
+            <div class="form-group">
+                <label for="sifre">Şifre:</label>
+                <input type="password" id="sifre" name="sifre" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block mt-4">Giriş Yap</button>
+        </form>
+        <div class="text-center mt-3">
+            <a href="{{ url_for('bp_business.login') }}">İşletme Girişi</a>
+        </div>
+    </div>
+    {% endblock %}

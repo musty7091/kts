@@ -1,0 +1,248 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Kargo Takip - Bee Cargo{% endblock %}
+
+{% block body_class %}public-tracking-page{% endblock %}
+
+{% block navbar %}
+<nav class="navbar navbar-expand-sm navbar-light shadow-sm fixed-top main-site-navbar">
+    {# main-site-navbar class'ı eklendi #}
+    <div class="container">
+        <a class="navbar-brand main-navbar-brand" href="{{ url_for('bp_common.index') }}">
+            <img src="{{ url_for('static', filename='images/bee.png') }}" alt="BeeCargo Logo" class="main-navbar-logo">
+            <span class="main-navbar-brand-text">
+                <span class="brand-bee">Bee</span><span class="brand-cargo">Cargo</span>
+            </span>
+        </a>
+        <ul class="navbar-nav ml-auto">
+            <li class="nav-item">
+                <a class="nav-link font-weight-bold" href="{{ url_for('bp_common.index') }}">
+                    <i class="fas fa-home mr-1"></i>Ana Sayfaya Dön
+                </a>
+            </li>
+        </ul>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-5 pt-5 mb-5">
+    {# pt-5 navbar için boşluk bırakır #}
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-7">
+            <div class="card shadow-sm">
+                <div class="card-header text-center public-tracking-page-card-header">
+                    {# Özel class eklendi, style.css'den stil alabilir #}
+                    <h3 class="mb-0 h4 font-weight-bold">Kargom Nerede?</h3>
+                </div>
+                <div class="card-body pt-4">
+                    <p class="text-muted text-center mb-3">Kargonuzun durumunu öğrenmek için takip numaranızı ve kayıtlı alıcı telefon numaranızı girin.</p>
+                    <form method="POST" action="{{ url_for('bp_common.track_shipment_public_input') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="form-group mb-3">
+                            <label for="takip_no_public" class="sr-only">Takip Numarası</label>
+                            <input type="text" id="takip_no_public" name="takip_no" class="form-control form-control-lg shadow-sm" placeholder="Takip Numaranız" value="{{ takip_no_param or request.form.get('takip_no', '') }}" required autofocus>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label for="alici_telefon_public" class="sr-only">Alıcı Telefon Numarası</label>
+                            <input type="tel" id="alici_telefon_public" name="alici_telefon" class="form-control form-control-lg shadow-sm" placeholder="Alıcı Telefon Numaranız (örn: 05xxxxxxxxx)" value="{{ alici_telefon_param or request.form.get('alici_telefon', '') }}" required pattern="[0-9\\s+()-]*" title="Lütfen geçerli bir telefon numarası girin.">
+                        </div>
+
+                        <button class="btn btn-primary btn-lg btn-block px-4 shadow-sm public-tracking-page-btn" type="submit">
+                            {# Özel class eklendi #}
+                            <i class="fas fa-search"></i> Sorgula
+                        </button>
+                    </form>
+                    {% if error_message %}
+                    <div class="alert alert-danger mt-3 text-center">{{ error_message }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if kargo %}
+            {# KargoDurumEnum'u Python tarafından bu şablona göndermeye gerek yok,
+            çünkü sadece kargo.kargo_durumu.value kullanıyoruz ve badge class'ları için
+            Enum üyelerini doğrudan Jinja içinde kullanabiliriz.
+            Eğer KargoDurumEnum.TESLIM_EDILDI gibi bir karşılaştırma yapacaksak,
+            Python'dan KargoDurumEnum=KargoDurumEnum şeklinde göndermemiz gerekir.
+            Şimdilik sadece .value kullandığımız için gerek yok, ama gönderilirse de zararı olmaz.
+            #}
+            <div class="card shadow-sm mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Takip No: <span class="font-weight-bold text-primary">{{ kargo.takip_numarasi }}</span></h5>
+                </div>
+                <div class="card-body">
+                    {# Kargo durumunu .value ile göster ve Enum ile karşılaştır #}
+                    <p>
+                        <strong>Durum:</strong>
+                        <span id="kargoDurumuBadge" class="badge
+                            {% if kargo.kargo_durumu.name == 'TESLIM_EDILDI' %}badge-success
+                            {% elif kargo.kargo_durumu.name in ['HAZIRLANIYOR', 'PAKETLENDI'] %}badge-warning
+                            {% elif kargo.kargo_durumu.name.startswith('IPTAL') or kargo.kargo_durumu.name.startswith('IADE') %}badge-danger
+                            {% else %}badge-info
+                            {% endif %}" style="font-size: 0.9rem; padding: .4em .7em;">
+                            {{ kargo.kargo_durumu.value }}
+                        </span>
+                    </p>
+                    <p class="mb-1"><strong>Alıcı:</strong> {{ kargo.alici_adi_soyadi }}</p>
+                    <p class="mb-1"><strong>Şehir:</strong> {{ kargo.alici_sehir }}{% if kargo.alici_ilce %} / {{ kargo.alici_ilce }}{% endif %}</p>
+                    <hr class="my-2">
+                    <p class="mb-1"><small class="text-muted">Oluşturulma Tarihi: {{ kargo.olusturulma_tarihi.strftime('%d-%m-%Y %H:%M') }}</small></p>
+                    {% if kargo.teslim_tarihi %}
+                    <p class="mb-1"><small class="text-muted">Teslim Tarihi: {{ kargo.teslim_tarihi.strftime('%d-%m-%Y %H:%M') }}</small></p>
+                    {% endif %}
+
+                    {# KargoDurumEnum.DAGITIMDA ile karşılaştırma #}
+                    {% if kargo.kargo_durumu.name == 'DAGITIMDA' %} {# .name ile Enum üyesinin adını alıyoruz #}
+                    <hr class="my-3">
+                    <div class="text-center">
+                        <button id="shareLocationBtnPublic" class="btn btn-info" data-takipno="{{ kargo.takip_numarasi }}">
+                            <i class="fas fa-map-marker-alt mr-1"></i> Geçici Teslimat Konumumu Paylaş
+                        </button>
+                        <small id="locationStatus" class="form-text text-muted mt-2"></small>
+                    </div>
+                    {% endif %}
+
+                    {% if kargo.alici_gecici_enlem and kargo.alici_gecici_boylam %}
+                    <hr class="my-2">
+                    <div class="alert alert-success small p-2">
+                        <i class="fas fa-check-circle"></i> Paylaşılan Geçici Teslimat Konumu <br>
+                        (Geçerlilik: ~{{ kargo.alici_gecici_konum_zamani.strftime('%H:%M') if kargo.alici_gecici_konum_zamani else 'Bilinmiyor' }}):
+                        <a href="https://www.google.com/maps?q={{ kargo.alici_gecici_enlem }},{{ kargo.alici_gecici_boylam }}" target="_blank" class="font-weight-bold">Haritada Gör</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const shareLocationBtn = document.getElementById('shareLocationBtnPublic');
+    const locationStatusEl = document.getElementById('locationStatus');
+
+    if (shareLocationBtn) {
+        shareLocationBtn.addEventListener('click', function() {
+            const takipNo = this.dataset.takipno;
+            if (!takipNo) {
+                if(locationStatusEl) locationStatusEl.textContent = "Hata: Takip numarası alınamadı.";
+                return;
+            }
+
+            if (navigator.geolocation) {
+                shareLocationBtn.disabled = true;
+                shareLocationBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Konum Alınıyor...';
+                if(locationStatusEl) locationStatusEl.textContent = "Konumunuz alınıyor, lütfen bekleyin...";
+
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const latitude = position.coords.latitude;
+                    const longitude = position.coords.longitude;
+                    if(locationStatusEl) locationStatusEl.textContent = "Konum alındı, sunucuya gönderiliyor...";
+
+                    fetch("{{ url_for('bp_common.update_receiver_temporary_location') }}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            // CSRF token eklenebilir (eğer kullanılıyorsa)
+                            // 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        },
+                        body: JSON.stringify({
+                            takip_no: takipNo,
+                            latitude: latitude,
+                            longitude: longitude
+                        })
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.json().then(err => Promise.reject(err));
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.success) {
+                            if(locationStatusEl) locationStatusEl.textContent = data.message || "Geçici konumunuz başarıyla paylaşıldı!";
+                            alert(data.message || "Geçici konumunuz başarıyla paylaşıldı!");
+                            window.location.reload(); // Sayfayı yenile
+                        } else {
+                            if(locationStatusEl) locationStatusEl.textContent = "Hata: " + (data.message || "Sunucu hatası.");
+                            alert("Konumunuz paylaşılamadı: " + (data.message || "Sunucu hatası."));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Konum paylaşma hatası:', error);
+                        if(locationStatusEl) locationStatusEl.textContent = "Konum paylaşılırken bir hata oluştu: " + (error.message || "");
+                        alert("Konum paylaşılırken bir hata oluştu.");
+                    })
+                    .finally(() => {
+                        shareLocationBtn.disabled = false;
+                        shareLocationBtn.innerHTML = '<i class="fas fa-map-marker-alt mr-1"></i> Geçici Teslimat Konumumu Paylaş';
+                    });
+
+                }, function(error) {
+                    console.error("Konum alınamadı: ", error);
+                    let userMessage = "Konum bilginizi alamadık. ";
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED: userMessage += "Konum paylaşımına izin vermediniz."; break;
+                        case error.POSITION_UNAVAILABLE: userMessage += "Konum bilgisi mevcut değil."; break;
+                        case error.TIMEOUT: userMessage += "Konum alma isteği zaman aşımına uğradı."; break;
+                        default: userMessage += "Bilinmeyen bir hata oluştu."; break;
+                    }
+                    if(locationStatusEl) locationStatusEl.textContent = userMessage;
+                    alert(userMessage);
+                    shareLocationBtn.disabled = false;
+                    shareLocationBtn.innerHTML = '<i class="fas fa-map-marker-alt mr-1"></i> Geçici Teslimat Konumumu Paylaş';
+                }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+            } else {
+                if(locationStatusEl) locationStatusEl.textContent = "Tarayıcınız konum servisini desteklemiyor.";
+                alert("Tarayıcınız konum servisini desteklemiyor.");
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+<style>
+    /* body.public-tracking-page style.css'e taşınabilir */
+    .public-tracking-page .card-header.public-tracking-page-card-header { /* Daha spesifik seçici */
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        background-color: #FFC107 !important; /* style.css'den gelenleri ezmek için !important */
+        color: #212529 !important;
+        border-bottom: none !important;
+    }
+
+    .public-tracking-page .form-control-lg {
+        font-size: 1.1rem;
+    }
+
+    .public-tracking-page .btn-primary.public-tracking-page-btn { /* Daha spesifik seçici */
+        background-color: #343a40 !important;
+        border-color: #343a40 !important;
+    }
+
+        .public-tracking-page .btn-primary.public-tracking-page-btn:hover {
+            background-color: #23272b !important;
+            border-color: #1d2124 !important;
+        }
+
+    .public-tracking-page .card-body hr.my-2 {
+        margin-top: 0.5rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    .public-tracking-page .card-body p {
+        font-family: 'Poppins', sans-serif;
+    }
+</style>
+{% endblock %}

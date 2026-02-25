@@ -1,0 +1,36 @@
+﻿{% extends "base.html" %}
+
+{% block title %}İşletme Girişi - Kargo Takip Sistemi{% endblock %}
+
+{% block navbar %}
+    {# Bu sayfada genel bir navbar görünmeyecek. #}
+{% endblock %}
+
+{% block head_extra %}
+<script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.body.classList.add('login-page');
+        });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="login-form-wrapper">
+    <h2 class="text-center mb-4">İşletme Girişi</h2>
+    <form method="POST" action="{{ url_for('bp_business.login') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+            <label for="kullanici_adi">Kullanıcı Adı:</label>
+            <input type="text" id="kullanici_adi" name="kullanici_adi" class="form-control" required value="{{ request.form.get('kullanici_adi', '') }}">
+        </div>
+        <div class="form-group">
+            <label for="sifre">Şifre:</label>
+            <input type="password" id="sifre" name="sifre" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-success btn-block mt-4">Giriş Yap</button>
+    </form>
+    <div class="text-center mt-3">
+        <a href="{{ url_for('bp_admin.login') }}">Yönetici Girişi</a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,170 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Kargo İşlemi: {{ kargo.takip_numarasi }} - Kurye Paneli{% endblock %}
+
+{% block body_class %}courier-action-page{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0 page-main-title">Kargo İşlem Sayfası</h2>
+        <a href="{{ url_for('bp_courier.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left mr-1"></i> Görev Listeme Dön
+        </a>
+    </div>
+
+    {% if kargo %}
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h3 class="mb-0 h5">Kargo Detayları: {{ kargo.takip_numarasi }}</h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5 class="text-muted">Alıcı Bilgileri</h5>
+                    <dl class="row">
+                        <dt class="col-sm-4">Alıcı Adı:</dt>
+                        <dd class="col-sm-8">{{ kargo.alici_adi_soyadi }}</dd>
+                        <dt class="col-sm-4">Telefon:</dt>
+                        <dd class="col-sm-8">{{ kargo.alici_telefon }}</dd>
+                        {% if kargo.alici_email %}
+                        <dt class="col-sm-4">E-posta:</dt>
+                        <dd class="col-sm-8">{{ kargo.alici_email }}</dd>
+                        {% endif %}
+                        <dt class="col-sm-4">Adres:</dt>
+                        <dd class="col-sm-8">{{ kargo.alici_adres }}</dd>
+                        <dt class="col-sm-4">Şehir/İlçe:</dt>
+                        <dd class="col-sm-8">{{ kargo.alici_sehir }}{% if kargo.alici_ilce %} / {{ kargo.alici_ilce }}{% endif %}</dd>
+                    </dl>
+                </div>
+                <div class="col-md-6">
+                    <h5 class="text-muted">Gönderi Bilgileri</h5>
+                    <dl class="row">
+                        <dt class="col-sm-5">Mevcut Durum:</dt>
+                        <dd class="col-sm-7"><span class="badge badge-info">{{ kargo.kargo_durumu.value }}</span></dd>
+                        <dt class="col-sm-5">Ödeme Yöntemi:</dt>
+                        <dd class="col-sm-7">{{ kargo.odeme_yontemi_teslimde or '-' }}</dd>
+                        {% if kargo.odeme_yontemi_teslimde == 'Kapıda Nakit' or kargo.odeme_yontemi_teslimde == 'Kapıda Kredi Kartı' %}
+                        <dt class="col-sm-5">Kapıda Tahsilat:</dt>
+                        <dd class="col-sm-7 font-weight-bold text-danger">{{ "%.2f"|format(kargo.toplam_tahsil_edilecek_alici) }} TL</dd>
+                        {% endif %}
+                        <dt class="col-sm-5">Gönderen İşletme:</dt>
+                        <dd class="col-sm-7">{{ kargo.isletme.isletme_adi }}</dd>
+                        <dt class="col-sm-12">İşletme Notu (Alıcıya):</dt>
+                        <dd class="col-sm-12">{{ kargo.ozel_not or 'Yok' }}</dd>
+                    </dl>
+                </div>
+            </div>
+
+            {% if kargo.alici_gecici_enlem and kargo.alici_gecici_boylam %}
+            <hr class="my-3">
+            <div class="row">
+                <div class="col-lg-12">
+                    <h5 class="text-success mb-3 mt-2"><i class="fas fa-map-marker-alt mr-2"></i>Alıcının Paylaştığı Geçici Teslimat Konumu</h5>
+                    <dl class="row">
+                        <dt class="col-sm-4">Paylaşım Zamanı:</dt>
+                        <dd class="col-sm-8">{{ kargo.alici_gecici_konum_zamani.strftime('%d-%m-%Y %H:%M') if kargo.alici_gecici_konum_zamani else 'Bilinmiyor' }}</dd>
+                        <dt class="col-sm-4">Google Maps Linki:</dt>
+                        <dd class="col-sm-8">
+                            <a href="https://www.google.com/maps?q={{ kargo.alici_gecici_enlem }},{{ kargo.alici_gecici_boylam }}" target="_blank" class="btn btn-sm btn-success">
+                                <i class="fas fa-directions mr-1"></i> Konuma Git (Harita)
+                            </a>
+                        </dd>
+                        <dt class="col-sm-4">Koordinatlar:</dt>
+                        <dd class="col-sm-8"><small>Enlem: {{ kargo.alici_gecici_enlem }}, Boylam: {{ kargo.alici_gecici_boylam }}</small></dd>
+                    </dl>
+                    {% if kargo.kargo_durumu.name != 'DAGITIMDA' %}
+                    <p class="mt-2 mb-0"><small class="text-warning"><i class="fas fa-exclamation-triangle"></i> Bu konum, kargo "Dağıtımda" değilken paylaşılmış olabilir. Lütfen güncel durumu ve alıcıyla iletişimi dikkate alın.</small></p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card shadow-sm mt-4">
+        <div class="card-header">
+            <h3 class="mb-0 h5">Durum Güncelleme ve Kurye Notu</h3>
+        </div>
+        <div class="card-body">
+            {% if kurye_guncellenebilir_durumlar %} {# Sadece güncellenecek durum varsa formu göster #}
+            <form method="POST" action="{{ url_for('bp_courier.shipment_action_by_courier', kargo_id=kargo.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-group">
+                    <label for="yeni_kargo_durumu_kurye"><strong>Yeni Kargo Durumu Seçin (*)</strong></label>
+                    <select id="yeni_kargo_durumu_kurye" name="yeni_kargo_durumu_kurye" class="form-control form-control-lg" required>
+                        <option value="" disabled selected>Lütfen bir durum seçin...</option>
+                        {# kurye_guncellenebilir_durumlar listesi (artık gecerli_sonraki_durumlar) Enum üyelerini içeriyor #}
+                        {% for durum_secenek in kurye_guncellenebilir_durumlar %}
+                        <option value="{{ durum_secenek.value }}">
+                            {{ durum_secenek.value }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-text text-muted">Kargonun bir sonraki geçerli durumunu listeden seçin.</small>
+                </div>
+
+                <div class="form-group mt-3">
+                    <label for="ozel_not_kurye">Kurye Notu (Teslimatla İlgili Ek Bilgi):</label>
+                    <textarea id="ozel_not_kurye" name="ozel_not_kurye" class="form-control" rows="3" placeholder="Örn: Alıcıya ulaşılamadı, komşusuna bırakıldı (isim), adres eksik vb.">{{ request.form.get('ozel_not_kurye', kargo.ozel_not or '') }}</textarea>
+                    <small class="form-text text-muted">Bu not, kargo detaylarında görünecektir.</small>
+                </div>
+
+                <div class="mt-4 text-right">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-check-circle mr-1"></i> Durumu ve Notu Kaydet
+                    </button>
+                </div>
+            </form>
+            {% else %}
+            <div class="alert alert-secondary mt-3">
+                Bu kargo için şu anda sizin tarafınızdan yapılabilecek bir durum güncellemesi bulunmamaktadır (Mevcut Durum: {{ kargo.kargo_durumu.value }}).
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% else %}
+    <div class="alert alert-danger text-center">
+        Kargo bilgileri bulunamadı veya bu kargoyu işleme yetkiniz yok.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    .page-main-title {
+        font-size: 1.75rem;
+        font-weight: 500;
+    }
+
+    .card-header h3.h5 {
+        font-size: 1.15rem;
+        font-weight: 500;
+    }
+
+    dl.row dt {
+        font-weight: 500;
+        font-size: 0.9em;
+    }
+
+    dl.row dd {
+        font-size: 0.9em;
+        margin-bottom: .5rem;
+    }
+
+    .form-control-lg {
+        font-size: 1.1rem;
+    }
+
+    .text-success .fas {
+        color: #28a745;
+    }
+
+    .text-warning .fas {
+        color: #ffc107;
+    }
+</style>
+{% endblock %}

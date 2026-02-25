@@ -1,0 +1,131 @@
+﻿{# templates/includes/_main_navbar.html #}
+{% set current_endpoint = request.endpoint %}
+<nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top shadow-sm main-site-navbar">
+    <div class="container">
+        {# Marka / Logo #}
+        <a class="navbar-brand main-navbar-brand" href="{{ url_for('bp_common.index') }}">
+            <img src="{{ url_for('static', filename='images/bee.png') }}" alt="BeeCargo Logo" class="main-navbar-logo">
+            <span class="main-navbar-brand-text">
+                <span class="brand-bee">Bee</span><span class="brand-cargo">Cargo</span>
+            </span>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#mainNavbarContent" aria-controls="mainNavbarContent" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="mainNavbarContent">
+            {# Soldaki Menü Linkleri - Kullanıcı Rolüne Göre #}
+            <ul class="navbar-nav mr-auto">
+                {% if 'admin_id' in session %}
+                <li class="nav-item {% if current_endpoint == 'bp_admin.dashboard' %}active{% endif %}">
+                    <a class="nav-link" href="{{ url_for('bp_admin.dashboard') }}">Admin Paneli</a>
+                </li>
+                <li class="nav-item {% if 'all_shipments' in current_endpoint or ('shipment_details' in current_endpoint and 'admin' in current_endpoint) %}active{% endif %}">
+                    <a class="nav-link" href="{{ url_for('bp_admin.all_shipments') }}">Tüm Kargolar</a>
+                </li>
+                <li class="nav-item dropdown {% if current_endpoint in ['bp_admin.add_business', 'bp_admin.isletme_bakiyeleri', 'bp_admin.reports', 'bp_admin.scan_shipment_status', 'bp_admin.add_courier', 'bp_admin.list_couriers'] %}active{% endif %}">
+                    <a class="nav-link dropdown-toggle" href="#" id="adminMoreLinks" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        Yönetim
+                    </a>
+                    <div class="dropdown-menu" aria-labelledby="adminMoreLinks">
+                        <a class="dropdown-item {% if current_endpoint == 'bp_admin.add_business' %}active{% endif %}" href="{{ url_for('bp_admin.add_business') }}">İşletme Ekle</a>
+                        <a class="dropdown-item {% if current_endpoint == 'bp_admin.isletme_bakiyeleri' %}active{% endif %}" href="{{ url_for('bp_admin.isletme_bakiyeleri') }}">Bakiyeler</a>
+                        <a class="dropdown-item {% if current_endpoint == 'bp_admin.reports' %}active{% endif %}" href="{{ url_for('bp_admin.reports') }}">Raporlar</a>
+                        <a class="dropdown-item {% if current_endpoint == 'bp_admin.scan_shipment_status' %}active{% endif %}" href="{{ url_for('bp_admin.scan_shipment_status') }}">Barkod Bul</a>
+                        <div class="dropdown-divider"></div>
+                        <h6 class="dropdown-header">Kurye Yönetimi</h6>
+                        <a class="dropdown-item {% if current_endpoint == 'bp_admin.add_courier' %}active{% endif %}" href="{{ url_for('bp_admin.add_courier') }}">Yeni Kurye Ekle</a>
+                        <a class="dropdown-item {% if current_endpoint == 'bp_admin.list_couriers' %}active{% endif %}" href="{{ url_for('bp_admin.list_couriers') }}">Kuryeleri Listele</a>
+                    </div>
+                </li>
+                {% elif 'isletme_id' in session %}
+                <li class="nav-item {% if current_endpoint == 'bp_business.dashboard' %}active{% endif %}">
+                    <a class="nav-link" href="{{ url_for('bp_business.dashboard') }}">Panelim</a>
+                </li>
+                <li class="nav-item {% if current_endpoint == 'bp_business.add_shipment' %}active{% endif %}">
+                    <a class="nav-link" href="{{ url_for('bp_business.add_shipment') }}">Kargo Ekle</a>
+                </li>
+                <li class="nav-item {% if current_endpoint == 'bp_business.payments' or current_endpoint == 'bp_business.payment_details' %}active{% endif %}">
+                    <a class="nav-link" href="{{ url_for('bp_business.payments') }}">Ödemelerim</a>
+                </li>
+                {% elif 'kurye_id' in session %}
+                <li class="nav-item {% if current_endpoint == 'bp_courier.dashboard' %}active{% endif %}">
+                    <a class="nav-link" href="{{ url_for('bp_courier.dashboard') }}">Görevlerim</a>
+                </li>
+                {% endif %}
+            </ul>
+
+            {# Sağdaki Kullanıcı Bilgileri ve Çıkış #}
+            <ul class="navbar-nav ml-auto align-items-center">
+                {% if 'admin_id' in session or 'isletme_id' in session or 'kurye_id' in session %}
+                <li class="nav-item dropdown mx-1">
+                    <a class="nav-link nav-icon-link" href="#" id="navbarDropdownNotificationsUser" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Bildirimler">
+                        <i class="fas fa-bell"></i>
+                        {% if unread_notification_count and unread_notification_count > 0 %}
+                        <span class="badge badge-danger navbar-badge">{{ unread_notification_count }}</span>
+                        {% endif %}
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdownNotificationsUser">
+                        {% if unread_notifications %}
+                        {% for notification in unread_notifications %}
+                        <a class="dropdown-item notification-item {% if not notification.okundu_mu %}font-weight-bold{% endif %}"
+                           href="{{ notification.link if notification.link else '#' }}"
+                           data-notification-id="{{ notification.id }}">
+                            {% if notification.bildirim_tipi %}<small class="notification-type">{{ notification.bildirim_tipi | replace('_', ' ') | title }}</small>{% endif %}
+                            <span class="message-body">{{ notification.mesaj }}</span>
+                            <small class="text-muted d-block timeago" datetime="{{ notification.olusturulma_tarihi.isoformat() }}Z">{{ notification.olusturulma_tarihi.strftime('%d-%m-%y %H:%M') }}</small>
+                        </a>
+                        {% if not loop.last %}<div class="dropdown-divider"></div>{% endif %}
+                        {% endfor %}
+                        {% endif %}
+                        {% if view_all_notifications_url %}
+                        {% if unread_notifications %}<div class="dropdown-divider"></div>{% endif %}
+                        <a class="dropdown-item text-center" href="{{ view_all_notifications_url }}"><small>Tüm Bildirimleri Gör</small></a>
+                        {% elif not unread_notifications %}
+                        <span class="dropdown-item disabled text-muted text-center"><small>Yeni bildirim yok.</small></span>
+                        {% endif %}
+                    </div>
+                </li>
+
+                <li class="nav-item dropdown mx-1">
+                    <a class="nav-link dropdown-toggle user-dropdown-toggle" href="#" id="userActionsDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fas fa-user-circle user-icon mr-1"></i>
+                        <span class="user-name">
+                            {% if 'admin_id' in session %}
+                            {{ session.get('admin_kullanici_adi', 'Admin') }}
+                            {% elif 'isletme_id' in session %}
+                            {{ session.get('isletme_kullanici_adi', 'İşletme') }}
+                            {% elif 'kurye_id' in session %}
+                            {{ session.get('kurye_ad_soyad', 'Kurye') }}
+                            {% endif %}
+                        </span>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-right" aria-labelledby="userActionsDropdown">
+                        {% if 'isletme_id' in session %}
+                        <a class="dropdown-item {% if request.endpoint == 'bp_business.change_password' %}active{% endif %}" href="{{ url_for('bp_business.change_password') }}"><i class="fas fa-key fa-fw mr-2"></i>Şifre Değiştir</a>
+                        {% elif 'admin_id' in session %}
+                        <a class="dropdown-item {% if request.endpoint == 'bp_admin.settings' %}active{% endif %}" href="{{ url_for('bp_admin.settings') }}"><i class="fas fa-cog fa-fw mr-2"></i>Ayarlar</a>
+                        {% endif %}
+
+                        <div class="dropdown-divider"></div>
+                        {% if 'admin_id' in session %}
+                        <a class="dropdown-item" href="{{ url_for('bp_admin.logout') }}"><i class="fas fa-sign-out-alt fa-fw mr-2"></i>Çıkış Yap</a>
+                        {% elif 'isletme_id' in session %}
+                        <a class="dropdown-item" href="{{ url_for('bp_business.logout') }}"><i class="fas fa-sign-out-alt fa-fw mr-2"></i>Çıkış Yap</a>
+                        {% elif 'kurye_id' in session %}
+                        <a class="dropdown-item" href="{{ url_for('bp_courier.logout') }}"><i class="fas fa-sign-out-alt fa-fw mr-2"></i>Çıkış Yap</a>
+                        {% endif %}
+                    </div>
+                </li>
+                {% else %}
+                <li class="nav-item">
+                    <a class="nav-link font-weight-bold" href="{{ url_for('bp_common.index') }}">
+                        <i class="fas fa-home mr-1"></i>Ana Sayfaya Dön
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</nav>

@@ -1,0 +1,109 @@
+﻿<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ subject }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            text-align: center;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eeeeee;
+        }
+
+            .header img {
+                max-height: 60px;
+                margin-bottom: 10px;
+            }
+
+            .header h2 {
+                margin-top: 0;
+                color: #333;
+            }
+
+        .content {
+            padding: 20px 0;
+        }
+
+            .content p {
+                margin-bottom: 15px;
+            }
+
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #eeeeee;
+            font-size: 0.9em;
+            color: #777;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            margin-top: 15px;
+            background-color: #FFC107;
+            color: #212529;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        strong {
+            color: #212529;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            {% if site_logo_url %}
+            <img src="{{ site_logo_url }}" alt="{{ site_name }} Logo">
+            {% endif %}
+            <h2>{{ subject }}</h2>
+        </div>
+        <div class="content">
+            <p>Merhaba Sayın <strong>{{ alici_adi_soyadi }}</strong>,</p>
+
+            <p><strong>{{ isletme_adi }}</strong> firmasından vermiş olduğunuz siparişinize ait <strong>{{ takip_numarasi }}</strong> takip numaralı kargonuz yola çıkmak üzere hazırlanmıştır.</p>
+
+            <p>Kargonuzun güncel durumunu ve tahmini teslim tarihini aşağıdaki bağlantıdan takip edebilirsiniz:</p>
+
+            {% if takip_url %}
+            <p style="text-align: center;">
+                <a href="{{ takip_url }}" class="button">Kargomu Takip Et</a>
+            </p>
+            {% endif %}
+
+            <p>Siparişinizle ilgili herhangi bir sorunuz olursa lütfen gönderici işletme ile iletişime geçiniz.</p>
+
+            <p>
+                İyi günler dileriz,<br>
+                <strong>{{ site_name }} Ekibi</strong>
+            </p>
+        </div>
+        <div class="footer">
+            <p>&copy; {{ now.year if now else "" }} {{ site_name }}. Tüm hakları saklıdır.</p>
+            {% if isletme_iletisim %}
+            <p><small>Gönderici İşletme İletişim: {{ isletme_iletisim }}</small></p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

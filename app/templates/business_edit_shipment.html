@@ -1,0 +1,238 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Kargo Düzenle: {{ kargo.takip_numarasi }} - İşletme Paneli{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-warning text-dark">
+            <h2 class="mb-0 h5">Kargo Bilgilerini Düzenle</h2>
+        </div>
+        <div class="card-body">
+            {% if kargo %}
+            <div class="alert alert-info small">
+                <p class="mb-1"><strong>Takip No:</strong> {{ kargo.takip_numarasi }}</p>
+                <p class="mb-0">
+                    <strong>Mevcut Kargo Durumu:</strong>
+                    <span class="badge badge-info">{{ kargo.kargo_durumu.value }}</span>
+                </p>
+                {% if not finansal_duzenlenebilir or not adres_ozelnot_duzenlenebilir %}
+                <p class="mt-2 mb-0 text-danger">
+                    <i class="fas fa-exclamation-triangle"></i> Bu kargonun mevcut durumu ({{ kargo.kargo_durumu.value }}) nedeniyle bazı alanlar düzenlenemez.
+                </p>
+                {% endif %}
+            </div>
+
+            <form method="POST" action="{{ url_for('bp_business.edit_shipment', kargo_id=kargo.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <h5 class="mt-4 mb-3 text-muted">Alıcı Bilgileri</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="alici_adi_soyadi_edit">Alıcı Adı Soyadı (*)</label>
+                            <input type="text" id="alici_adi_soyadi_edit" name="alici_adi_soyadi" class="form-control form-control-sm" value="{{ form_data.get('alici_adi_soyadi', kargo.alici_adi_soyadi) }}" {% if not adres_ozelnot_duzenlenebilir %}readonly{% endif %} required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="alici_telefon_edit">Alıcı Telefon (*)</label>
+                            <input type="tel" id="alici_telefon_edit" name="alici_telefon" class="form-control form-control-sm" value="{{ form_data.get('alici_telefon', kargo.alici_telefon) }}" {% if not adres_ozelnot_duzenlenebilir %}readonly{% endif %} placeholder="Örn: +905xxxxxxxxx" required>
+                            <small class="form-text text-muted">Uluslararası E.164 formatında giriniz (örn: +905331234567).</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="alici_email_edit">Alıcı E-posta</label>
+                            <input type="email" id="alici_email_edit" name="alici_email" class="form-control form-control-sm" value="{{ form_data.get('alici_email', kargo.alici_email or '') }}" {% if not adres_ozelnot_duzenlenebilir %}readonly{% endif %}>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="alici_sehir_edit">İlçe (*)</label>
+                            <select id="alici_sehir_edit" name="alici_sehir" class="form-control form-control-sm" {% if not adres_ozelnot_duzenlenebilir %}disabled{% else %}required{% endif %}>
+                                <option value="" {% if not form_data.get('alici_sehir', kargo.alici_sehir) %}selected{% endif %} disabled>İlçe Seçiniz...</option>
+                                {% for ilce_adi in kktc_ilceler %}
+                                <option value="{{ ilce_adi }}" {% if form_data.get('alici_sehir', kargo.alici_sehir)= =ilce_adi %}selected{% endif %}>{{ ilce_adi }}</option>
+                                {% endfor %}
+                            </select>
+                            {% if not adres_ozelnot_duzenlenebilir %}<input type="hidden" name="alici_sehir" value="{{ kargo.alici_sehir }}">{% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="alici_ilce_edit">Köy/Mahalle</label>
+                            <select id="alici_ilce_edit" name="alici_ilce" class="form-control form-control-sm" {% if not adres_ozelnot_duzenlenebilir %}disabled{% endif %}>
+                                <option value="">Önce İlçe Seçiniz...</option>
+                                {# JavaScript ile doldurulacak ve kargo.alici_ilce seçili gelecek #}
+                            </select>
+                            {% if not adres_ozelnot_duzenlenebilir %}<input type="hidden" name="alici_ilce" value="{{ kargo.alici_ilce or '' }}">{% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="alici_adres_edit">Alıcı Açık Adres (Sokak, Kapı No vb.) (*)</label>
+                    <textarea id="alici_adres_edit" name="alici_adres" class="form-control form-control-sm" rows="2" {% if not adres_ozelnot_duzenlenebilir %}readonly{% endif %} required>{{ form_data.get('alici_adres', kargo.alici_adres) }}</textarea>
+                </div>
+
+                <hr class="my-4">
+                <h5 class="mt-3 mb-3 text-muted">Finansal Bilgiler</h5>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="urun_bedeli_alici_tahsil_edit">Ürün Bedeli (Alıcıdan Tahsil) (*)</label>
+                            <input type="text" id="urun_bedeli_alici_tahsil_edit" name="urun_bedeli_alici_tahsil" class="form-control form-control-sm" value="{{ form_data.get('urun_bedeli_alici_tahsil', kargo.urun_bedeli_alici_tahsil) }}" {% if not finansal_duzenlenebilir %}readonly{% endif %} required>
+                            {% if not finansal_duzenlenebilir %}<small class="form-text text-danger">Kargonun mevcut durumu ({{ kargo.kargo_durumu.value }}) nedeniyle ürün bedeli değiştirilemez.</small>{% else %}<small class="form-text text-muted">Son kullanıcıdan tahsil edilecek ürünün fiyatı.</small>{% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="kargo_ucreti_alici_tahsil_edit">Kargo Ücreti (Alıcıdan Tahsil Edilecekse)</label>
+                            <input type="text" id="kargo_ucreti_alici_tahsil_edit" name="kargo_ucreti_alici_tahsil" class="form-control form-control-sm" value="{{ form_data.get('kargo_ucreti_alici_tahsil', kargo.kargo_ucreti_alici_tahsil) }}" {% if not finansal_duzenlenebilir %}readonly{% endif %}>
+                            {% if not finansal_duzenlenebilir %}<small class="form-text text-danger">Kargonun mevcut durumu nedeniyle kargo ücreti değiştirilemez.</small>{% else %}<small class="form-text text-muted">Alıcıdan ayrıca kargo ücreti tahsil edilecekse girin.</small>{% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="odeme_yontemi_teslimde_display_edit">Ödeme Yöntemi (Teslimde)</label>
+                    <input type="text" id="odeme_yontemi_teslimde_display_edit" name="odeme_yontemi_teslimde_display" class="form-control form-control-sm" value="{{ kargo.odeme_yontemi_teslimde or 'Belirtilmedi' }}" readonly>
+                    <small class="form-text text-muted">Ödeme yöntemi bu ekrandan değiştirilemez.</small>
+                </div>
+
+                <hr class="my-4">
+                <h5 class="mt-3 mb-3 text-muted">Diğer Bilgiler</h5>
+                <div class="form-group">
+                    <label for="ozel_not_edit">Özel Not (Kargo Elemanı İçin)</label>
+                    <textarea id="ozel_not_edit" name="ozel_not" class="form-control form-control-sm" rows="2" {% if not adres_ozelnot_duzenlenebilir %}readonly{% endif %}>{{ form_data.get('ozel_not', kargo.ozel_not or '') }}</textarea>
+                </div>
+
+                <hr class="my-4">
+                <p class="text-muted"><small>(*) ile işaretli alanlar zorunludur.</small></p>
+                <div class="form-group text-right">
+                    <a href="{{ url_for('bp_business.shipment_details', kargo_id=kargo.id) }}" class="btn btn-outline-secondary mr-2">
+                        {# Geri Dönüş Linki Güncellendi #}
+                        <i class="fas fa-times mr-1"></i> İptal Et
+                    </a>
+                    <button type="submit" class="btn btn-warning" {% if not finansal_duzenlenebilir and not adres_ozelnot_duzenlenebilir %}disabled title="Bu kargo için düzenleme yapılamaz." {% endif %}>
+                        <i class="fas fa-save mr-1"></i> Değişiklikleri Kaydet
+                    </button>
+                </div>
+            </form>
+            {% else %}
+            <div class="alert alert-danger">Düzenlenecek kargo bilgisi bulunamadı.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    .card-header h2.h5 {
+        font-size: 1.25rem;
+        font-weight: 500;
+    }
+
+    .form-group label {
+        font-weight: 500;
+        font-size: 0.85rem;
+        margin-bottom: .2rem;
+    }
+
+    .form-control-sm {
+        font-size: 0.85rem;
+        height: calc(1.5em + .5rem + 2px);
+    }
+
+    hr.my-4 {
+        margin-top: 1.5rem !important;
+        margin-bottom: 1.5rem !important;
+    }
+
+    h5.text-muted {
+        font-size: 1.1rem;
+    }
+
+    input[readonly].form-control,
+    textarea[readonly].form-control,
+    select[disabled].form-control-sm {
+        background-color: #e9ecef;
+        opacity: 1;
+        cursor: not-allowed;
+    }
+
+    .alert-info strong {
+        margin-right: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ilceSelectEdit = document.getElementById('alici_sehir_edit'); // İlçe dropdown'ı
+    const koySelectEdit = document.getElementById('alici_ilce_edit');  // Köy/Mahalle dropdown'ı
+    const adresDuzenlenebilir = {{ adres_ozelnot_duzenlenebilir|tojson }}; // Python boolean'ını JS boolean'ına çevir
+
+    let kktcDataEdit = {};
+    try {
+        kktcDataEdit = JSON.parse({{ kktc_konumlar_json | tojson | safe }});
+    } catch (e) {
+        console.error("KKTC konum verisi (edit) parse edilirken hata:", e);
+    }
+
+    // Kargonun mevcut ilçe ve köy/mahalle bilgilerini al
+    // Eğer form POST sonrası hata ile render ediliyorsa, form_data'dan al, yoksa kargo nesnesinden.
+    const currentKargoIlce = "{{ form_data.get('alici_sehir', kargo.alici_sehir or '') }}";
+    const currentKargoKoy = "{{ form_data.get('alici_ilce', kargo.alici_ilce or '') }}";
+
+    function populateKoylerEdit(selectedIlce, preSelectedKoy) {
+        koySelectEdit.innerHTML = ''; // Temizle
+
+        if (selectedIlce && kktcDataEdit[selectedIlce]) {
+            koySelectEdit.disabled = !adresDuzenlenebilir; // Eğer düzenlenemezse hep disabled kalsın
+
+            let defaultOption = new Option('Köy/Mahalle Seçiniz...', '');
+            koySelectEdit.add(defaultOption);
+
+            kktcDataEdit[selectedIlce].forEach(function(koy) {
+                const option = new Option(koy, koy);
+                // Hem ilçe eşleşmeli hem de köy değeri preSelectedKoy ile eşleşmeli
+                if (koy === preSelectedKoy && selectedIlce === currentKargoIlce) {
+                    option.selected = true;
+                }
+                koySelectEdit.add(option);
+            });
+        } else {
+            koySelectEdit.innerHTML = '<option value="">Önce İlçe Seçiniz...</option>';
+            koySelectEdit.disabled = true;
+        }
+    }
+
+    // Sayfa yüklendiğinde mevcut ilçe için köyleri yükle ve mevcut köyü seçili yap
+    if (currentKargoIlce) {
+        populateKoylerEdit(currentKargoIlce, currentKargoKoy);
+    } else {
+         koySelectEdit.innerHTML = '<option value="">Önce İlçe Seçiniz...</option>';
+         koySelectEdit.disabled = true; // İlçe seçili değilse köy de disable olmalı
+    }
+
+    // İlçe değiştiğinde köyleri güncelle (sadece adres düzenlenebilirse)
+    if (adresDuzenlenebilir) {
+        ilceSelectEdit.addEventListener('change', function() {
+            // İlçe değiştiğinde, önceden seçili köyü sıfırla (yeni ilçenin köyleri yüklenecek)
+            populateKoylerEdit(this.value, null);
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,181 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Bee Cargo'ya Hoş Geldiniz{% endblock %}
+
+{% block body_class %}landing-page{% endblock %}
+
+{% block navbar %}
+    {# Bu sayfada merkezi navbar gösterilmeyecek #}
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Montserrat:wght@700;800&display=swap" rel="stylesheet">
+
+{# style.css dosyası zaten base.html üzerinden yüklendiği için buradaki
+<style>
+ bloğu
+   sadece bu sayfaya ÇOK ÖZEL, anlık arı animasyonu gibi stiller burada kalabilir.
+   Buton ve genel landing page stilleri style.css'e taşınmıştı.
+#}
+<style>
+    /* Arı imleci ve temel landing page gövde stilleri (style.css'de de benzerleri var,
+       buradakiler style.css'dekileri ezecektir veya tamamlayacaktır.)
+       style.css'deki body.landing-page seçicisi ile tanımlandığı için buradan kaldırılabilir.
+       Örnek olarak arı imleci stilini burada bırakıyorum.
+    */
+    #mouse-bee {
+        position: fixed;
+        width: 35px;
+        height: 35px;
+        background-image: url("{{ url_for('static', filename='images/bee.png') }}");
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center center;
+        pointer-events: none; /* Mouse olaylarını engellemez */
+        z-index: 9999; /* En üstte olması için */
+        will-change: left, top; /* Animasyon performansı için tarayıcıya ipucu */
+        /* transform: translate(-50%, -50%); Javascript içinde ayarlanacak */
+    }
+    /* Landing page için temel body stilleri style.css'e taşındığı için buradan silindi.
+       Eğer özel bir durum gerekmiyorsa, style.css'deki body.landing-page yeterlidir. */
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cover-container d-flex w-100 h-100 p-3 mx-auto flex-column justify-content-center">
+    <div class="company-brand">
+        <h1 class="brand-title">
+            <span class="brand-bee">Bee</span><span class="brand-cargo">Cargo</span>
+        </h1>
+    </div>
+
+    <main role="main" class="px-3">
+        <p class="lead lead-text mt-3">
+            Hızlı, güvenilir ve yenilikçi kargo çözümleri.
+            <br class="d-none d-sm-block">
+            Giriş yapmak için lütfen panelinizi seçin:
+        </p>
+
+        <div class="mt-4 btn-landing-group">
+            {# Giriş butonları (Admin, İşletme, Kurye) - Geniş ekranlarda yan yana, dar ekranlarda alt alta #}
+            <div class="d-flex flex-column flex-md-row justify-content-center align-items-center login-buttons-group">
+                <a href="{{ url_for('bp_admin.login') }}" class="btn btn-lg btn-admin font-weight-bold mx-md-2 my-2 my-md-0">
+                    <i class="fas fa-user-shield mr-1"></i>Yönetici Girişi
+                </a>
+                <a href="{{ url_for('bp_business.login') }}" class="btn btn-lg btn-business font-weight-bold mx-md-2 my-2 my-md-0">
+                    <i class="fas fa-store mr-1"></i>İşletme Girişi
+                </a>
+                <a href="{{ url_for('bp_courier.login') }}" class="btn btn-lg btn-courier font-weight-bold mx-md-2 my-2 my-md-0">
+                    <i class="fas fa-motorcycle mr-1"></i>Kurye Girişi
+                </a>
+            </div>
+
+            {# "Kargom Nerede?" butonu - Her zaman alt sırada ve ortalı #}
+            <div class="mt-3 mt-md-3 text-center">
+                <a href="{{ url_for('bp_common.track_shipment_public_input') }}" class="btn btn-lg btn-tracking font-weight-bold">
+                    <i class="fas fa-search-location mr-1"></i>Kargom Nerede?
+                </a>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const beeElement = document.createElement('div');
+    beeElement.id = 'mouse-bee';
+    document.body.appendChild(beeElement);
+
+    let targetX = window.innerWidth / 2;
+    let targetY = window.innerHeight / 2;
+    let currentX = targetX;
+    let currentY = targetY;
+
+    // Arı görselinin CSS'de tanımlanan boyutlarını alalım (veya sabit değerler kullanalım)
+    // Bu değerlerin #mouse-bee için CSS'de tanımlı olması beklenir.
+    const computedStyle = getComputedStyle(beeElement);
+    const beeWidth = parseFloat(computedStyle.width) || 35;
+    const beeHeight = parseFloat(computedStyle.height) || 35;
+    const offsetX = beeWidth / 2;
+    const offsetY = beeHeight / 2;
+
+    document.addEventListener('mousemove', function (e) {
+        targetX = e.clientX;
+        targetY = e.clientY;
+    });
+
+    let animationFrameId = null;
+
+    function animateBee() {
+        const dx = targetX - currentX;
+        const dy = targetY - currentY;
+        const easing = 0.12; // Yumuşatma faktörü (daha düşük değer = daha yavaş takip)
+
+        if (Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) { // Çok yakınsa direkt eşitle
+            currentX = targetX;
+            currentY = targetY;
+        } else {
+            currentX += dx * easing;
+            currentY += dy * easing;
+        }
+
+        beeElement.style.left = (currentX - offsetX) + 'px';
+        beeElement.style.top = (currentY - offsetY) + 'px';
+
+        animationFrameId = requestAnimationFrame(animateBee);
+    }
+
+    // Görselin yüklenmesini beklemek (arka plan resmi olduğu için bu yöntem %100 olmayabilir)
+    const tempImage = new Image();
+    tempImage.src = "{{ url_for('static', filename='images/bee.png') }}";
+
+    tempImage.onload = function() {
+        // console.log("Arı görseli başarıyla yüklendi. Animasyon başlatılıyor.");
+        if (!animationFrameId && document.body.classList.contains('landing-page')) { // Sadece landing page'de başlat
+            animateBee();
+        }
+    };
+    tempImage.onerror = function() {
+        console.warn("Arı görseli (" + tempImage.src + ") yüklenemedi veya bulunamadı.");
+        if (beeElement) {
+            beeElement.style.display = 'none'; // Arıyı gizle
+        }
+        if (document.body.classList.contains('landing-page')) {
+            document.body.style.cursor = 'default'; // Gizlenen gerçek imleci geri göster
+        }
+    };
+
+    // Fallback: Eğer onload/onerror tetiklenmezse, kısa bir süre sonra yine de başlat
+    setTimeout(() => {
+        if (!animationFrameId && document.getElementById('mouse-bee') && document.body.classList.contains('landing-page')) {
+            // console.log("Fallback: Animasyon başlatılıyor.");
+             animateBee();
+        }
+    }, 250);
+
+
+    // Sayfa odağını kaybettiğinde veya kazandığında animasyonu durdur/başlat
+    document.addEventListener("visibilitychange", function() {
+        if (document.body.classList.contains('landing-page')) { // Sadece landing page için
+            if (document.hidden) {
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                    // console.log("Animasyon durduruldu: Sayfa gizli.");
+                }
+            } else {
+                if (!animationFrameId && document.getElementById('mouse-bee')) {
+                    // console.log("Animasyon başlatıldı: Sayfa görünür.");
+                    animateBee();
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

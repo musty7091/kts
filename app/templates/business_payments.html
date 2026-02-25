@@ -1,0 +1,84 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Ödeme Geçmişim - {{ session.get('isletme_adi', 'İşletme Paneli') }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Ödeme Geçmişim</h2>
+        <a href="{{ url_for('bp_business.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-tachometer-alt mr-1"></i> İşletme Paneline Geri Dön
+        </a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-info text-white">
+            <h3 class="mb-0 h5">Tarafınıza Yapılan Ödeme/Mahsup Kayıtları</h3>
+        </div>
+        <div class="card-body">
+            {% if odemeler %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover table-bordered">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Ödeme Tarihi</th>
+                            <th class="text-right">Net Tutar (TL)</th>
+                            <th>Açıklama/Referans No</th>
+                            <th class="text-center">Eylemler</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for odeme in odemeler %}
+                        <tr>
+                            <td>{{ odeme.odeme_tarihi.strftime('%d-%m-%Y') }}</td>
+                            <td class="text-right font-weight-bold {% if odeme.odenen_tutar < 0 %}text-danger{% elif odeme.odenen_tutar > 0 %}text-success{% else %}text-muted{% endif %}">
+                                {{ "%.2f"|format(odeme.odenen_tutar) }}
+                            </td>
+                            <td>{{ odeme.aciklama if odeme.aciklama else (odeme.islem_referansi if odeme.islem_referansi else '-') }}</td>
+                            <td class="text-center">
+                                <a href="{{ url_for('bp_business.payment_details', odeme_id=odeme.id) }}" class="btn btn-sm btn-outline-primary" title="Ödeme Detayları ve İlişkili Kargolar">
+                                    <i class="fas fa-info-circle"></i> Detaylar
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">Henüz tarafınıza yapılmış bir ödeme/mahsup kaydı bulunmamaktadır.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    .table thead th {
+        background-color: #e9ecef;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+
+    .table td {
+        font-size: 0.85rem;
+        vertical-align: middle;
+    }
+
+    .card-header h3.h5 {
+        font-size: 1.25rem;
+        font-weight: 500;
+    }
+
+    h2.mb-0 {
+        font-size: 1.75rem;
+    }
+    /* Bakiye renkleri için Bootstrap text-success ve text-danger kullanıldı */
+</style>
+{% endblock %}
+
+{% block scripts_extra %}
+    {# Bu sayfaya özel JavaScript (varsa) #}
+{% endblock %}

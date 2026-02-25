@@ -1,0 +1,153 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Admin Paneli - Kargo Takip Sistemi{% endblock %}
+
+{% block body_class %}admin-dashboard-page{% endblock %}
+
+{% block content %}
+<div class="jumbotron jumbotron-fluid bg-primary text-white rounded pt-4 pb-4 mb-4">
+    <div class="container">
+        <h1 class="display-5">Yönetici Paneli</h1>
+        <p class="lead">Sistemi buradan yönetebilirsiniz.</p>
+    </div>
+</div>
+
+<div class="mb-4">
+    <h2 class="quick-links-header">Hızlı İşlemler</h2>
+    <div class="list-group list-group-horizontal-md flex-wrap">
+        {# flex-wrap eklendi #}
+        <a href="{{ url_for('bp_admin.add_business') }}" class="list-group-item list-group-item-action list-group-item-success flex-fill text-center mb-2 mb-md-0">
+            <i class="fas fa-plus-circle"></i> Yeni İşletme Ekle
+        </a>
+        <a href="{{ url_for('bp_admin.all_shipments') }}" class="list-group-item list-group-item-action list-group-item-info flex-fill text-center mb-2 mb-md-0">
+            <i class="fas fa-truck"></i> Tüm Kargolar
+        </a>
+        <a href="{{ url_for('bp_admin.scan_shipment_status') }}" class="list-group-item list-group-item-action list-group-item-purple flex-fill text-center mb-2 mb-md-0">
+            <i class="fas fa-barcode"></i> Barkod ile Kargo Bul
+        </a>
+        <a href="{{ url_for('bp_admin.isletme_bakiyeleri') }}" class="list-group-item list-group-item-action list-group-item-warning flex-fill text-center mb-2 mb-md-0">
+            <i class="fas fa-balance-scale"></i> İşletme Bakiyeleri
+        </a>
+        {# YENİ: Kurye Yönetimi Hızlı Linkleri #}
+        <a href="{{ url_for('bp_admin.add_courier') }}" class="list-group-item list-group-item-action list-group-item-primary flex-fill text-center mb-2 mb-md-0">
+            <i class="fas fa-user-plus"></i> Yeni Kurye Ekle
+        </a>
+        <a href="{{ url_for('bp_admin.list_couriers') }}" class="list-group-item list-group-item-action list-group-item-dark flex-fill text-center mb-2 mb-md-0">
+            <i class="fas fa-users-cog"></i> Kuryeleri Yönet
+        </a>
+        {# ------------------------------------ #}
+        <a href="{{ url_for('bp_admin.settings') }}" class="list-group-item list-group-item-action list-group-item-secondary flex-fill text-center mb-2 mb-md-0">
+            <i class="fas fa-cog"></i> Genel Ayarlar
+        </a>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-light">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="mb-0 h5">Kayıtlı İşletmeler</h2>
+            <form method="GET" action="{{ url_for('bp_admin.dashboard') }}" class="form-inline">
+                <div class="input-group input-group-sm">
+                    <input type="text" name="q_isletme" class="form-control" placeholder="İşletme Adı/Kodu Ara" value="{{ request.args.get('q_isletme', '') }}">
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-secondary" type="submit"><i class="fas fa-search"></i></button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if isletmeler_data %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-bordered table-business-list">
+                <thead class="thead-light">
+                    <tr>
+                        <th>İşletme Adı</th>
+                        <th>İşletme Kodu</th>
+                        <th>Kullanıcı Adı</th>
+                        <th class="text-right">Kazanılan Hizmet Bedeli (TL)</th>
+                        <th>Yetkili Kişi</th>
+                        <th>Telefon</th>
+                        <th>Aktif Mi?</th>
+                        <th>Eylemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for data_item in isletmeler_data %}
+                    {% set isletme = data_item.isletme_detay %}
+                    <tr>
+                        <td>{{ isletme.isletme_adi }}</td>
+                        <td><span class="badge badge-pill badge-dark">{{ isletme.isletme_kodu }}</span></td>
+                        <td>{{ isletme.kullanici_adi }}</td>
+                        <td class="text-right font-weight-bold text-success">
+                            {{ "%.2f"|format(data_item.toplam_kazanc) }}
+                        </td>
+                        <td>{{ isletme.yetkili_kisi or '-' }}</td>
+                        <td>{{ isletme.isletme_telefon or '-' }}</td>
+                        <td>
+                            {% if isletme.aktif_mi %}
+                            <span class="badge badge-success">Evet</span>
+                            {% else %}
+                            <span class="badge badge-danger">Hayır</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('bp_admin.edit_business', isletme_id=isletme.id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-edit"></i> Düzenle
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            {% if request.args.get('q_isletme') %}
+            Aradığınız kriterlere uygun işletme bulunamadı.
+            {% else %}
+            Sistemde kayıtlı işletme bulunmamaktadır. <a href="{{ url_for('bp_admin.add_business') }}" class="alert-link">Hemen bir tane ekleyin!</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    .quick-links-header {
+        font-size: 1.3rem;
+        margin-bottom: 0.75rem;
+        font-weight: 500;
+        color: #495057;
+    }
+
+    .list-group-item i {
+        margin-right: 0.5rem;
+    }
+
+    .list-group-item-purple {
+        color: #fff;
+        background-color: #6f42c1;
+        border-color: #6f42c1;
+    }
+
+        .list-group-item-purple:hover {
+            color: #fff;
+            background-color: #59369a;
+            border-color: #53328e;
+        }
+
+    .card-header .form-inline .form-control {
+        width: auto;
+    }
+    /* Küçük ekranlarda hızlı işlem butonlarının alt alta gelmesi için */
+    @media (max-width: 767.98px) {
+        .list-group-horizontal-md {
+            flex-direction: column;
+        }
+    }
+</style>
+{% endblock %}

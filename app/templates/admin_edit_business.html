@@ -1,0 +1,117 @@
+﻿{% extends "base.html" %}
+
+{% block title %}İşletme Düzenle: {{ isletme.isletme_adi }} - Admin Paneli{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-warning text-dark">
+            <h2 class="mb-0 h5">İşletme Bilgilerini Düzenle: {{ isletme.isletme_adi }}</h2>
+        </div>
+        <div class="card-body">
+            {% if isletme %}
+            <form method="POST" action="{{ url_for('bp_admin.edit_business', isletme_id=isletme.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="isletme_adi">İşletme Adı (*)</label>
+                            <input type="text" id="isletme_adi" name="isletme_adi" class="form-control" value="{{ request.form.get('isletme_adi', isletme.isletme_adi) }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="isletme_kodu_display">İşletme Kodu</label>
+                            <input type="text" id="isletme_kodu_display" name="isletme_kodu_display" class="form-control" value="{{ isletme.isletme_kodu }}" readonly>
+                            <small class="form-text text-muted">İşletme kodu değiştirilemez.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="kullanici_adi_display">Giriş İçin Kullanıcı Adı</label>
+                    <input type="text" id="kullanici_adi_display" name="kullanici_adi_display" class="form-control" value="{{ isletme.kullanici_adi }}" readonly>
+                    <small class="form-text text-muted">Kullanıcı adı değiştirilemez.</small>
+                </div>
+
+                <hr class="my-4">
+                <h5 class="mt-3 mb-3 text-muted">İletişim ve Diğer Bilgiler</h5>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="isletme_email">İşletme Email (*)</label> {# Zorunluluk eklendi #}
+                            <input type="email" id="isletme_email" name="isletme_email" class="form-control" value="{{ request.form.get('isletme_email', isletme.isletme_email or '') }}" required> {# required eklendi #}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="isletme_telefon">İşletme Telefon (*)</label> {# GÜNCELLENDİ #}
+                            <input type="tel" id="isletme_telefon" name="isletme_telefon" class="form-control" value="{{ request.form.get('isletme_telefon', isletme.isletme_telefon or '') }}" required> {# GÜNCELLENDİ #}
+                            <small class="form-text text-muted">Örn: +905xxxxxxxxx</small> {# GÜNCELLENDİ #}
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="yetkili_kisi">Yetkili Kişi</label>
+                    <input type="text" id="yetkili_kisi" name="yetkili_kisi" class="form-control" value="{{ request.form.get('yetkili_kisi', isletme.yetkili_kisi or '') }}">
+                </div>
+                <div class="form-group">
+                    <label for="isletme_adres">İşletme Adres</label>
+                    <textarea id="isletme_adres" name="isletme_adres" class="form-control" rows="3">{{ request.form.get('isletme_adres', isletme.isletme_adres or '') }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="aktif_mi">Aktif Mi? (*)</label>
+                    <select id="aktif_mi" name="aktif_mi" class="form-control" required>
+                        {% set current_aktif_mi = request.form.get('aktif_mi', isletme.aktif_mi|string) %}
+                        <option value="True" {% if current_aktif_mi=='True' %}selected{% endif %}>Evet (Aktif)</option>
+                        <option value="False" {% if current_aktif_mi=='False' %}selected{% endif %}>Hayır (Pasif)</option>
+                    </select>
+                </div>
+
+                <hr class="my-4">
+                <p class="text-muted"><small>(*) ile işaretli alanlar zorunludur.</small></p>
+                <div class="form-group text-right">
+                    <a href="{{ url_for('bp_admin.dashboard') }}" class="btn btn-outline-secondary mr-2">
+                        <i class="fas fa-times mr-1"></i> İptal Et
+                    </a>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-save mr-1"></i> Değişiklikleri Kaydet
+                    </button>
+                </div>
+            </form>
+            {% else %}
+            <div class="alert alert-danger">Düzenlenecek işletme bulunamadı.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    .card-header h2.h5 {
+        font-size: 1.25rem;
+        font-weight: 500;
+    }
+
+    .form-group label {
+        font-weight: 500;
+    }
+
+    hr.my-4 {
+        margin-top: 1.5rem !important;
+        margin-bottom: 1.5rem !important;
+    }
+
+    h5.text-muted {
+        font-size: 1.1rem;
+    }
+
+    input[readonly].form-control {
+        background-color: #e9ecef;
+        opacity: 1;
+    }
+</style>
+{% endblock %}

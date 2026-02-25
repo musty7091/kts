@@ -1,0 +1,232 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Tüm Bildirimler{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    .notification-list-item {
+        border-bottom: 1px solid #eee;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+
+        .notification-list-item:last-child {
+            border-bottom: none;
+        }
+
+        .notification-list-item.unread {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+
+        .notification-list-item .message {
+            font-size: 0.95rem;
+        }
+
+        .notification-list-item .timestamp {
+            font-size: 0.75rem;
+            color: #6c757d;
+        }
+
+        .notification-list-item .notification-type {
+            font-size: 0.8rem;
+            color: #007bff;
+            font-weight: normal;
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+    .pagination-container {
+        margin-top: 2rem;
+        display: flex;
+        justify-content: center;
+    }
+
+    .notification-actions {
+        margin-bottom: 1.5rem;
+        text-align: right;
+    }
+
+        .notification-actions .btn {
+            margin-left: 0.5rem;
+        }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        {# Başlık ve geri dön butonu için mb-3 #}
+        <h2 class="mb-0 page-main-title">Tüm Bildirimler</h2>
+        {% set back_url = url_for('bp_common.index') %} {# Varsayılan geri dönüş #}
+        {% if 'admin_id' in session %}
+        {% set back_url = url_for('bp_admin.dashboard') %}
+        {% elif 'isletme_id' in session %}
+        {% set back_url = url_for('bp_business.dashboard') %}
+        {% elif 'kurye_id' in session %}
+        {% set back_url = url_for('bp_courier.dashboard') %}
+        {% endif %}
+        <a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm">Panele Geri Dön</a>
+    </div>
+
+    {# YENİ: Toplu İşlem Butonları #}
+    {% if notifications_paginated and notifications_paginated.items %}
+    <div class="notification-actions">
+        <button class="btn btn-sm btn-outline-info" id="markAllReadBtn">
+            <i class="fas fa-check-double"></i> Tümünü Okundu Say
+        </button>
+        <button class="btn btn-sm btn-outline-danger" id="deleteAllBtn">
+            <i class="fas fa-trash-alt"></i> Tümünü Sil
+        </button>
+    </div>
+    {% endif %}
+
+    <div class="card shadow-sm">
+        <div class="card-body" id="notificationListContainer">
+            {# Bildirim listesine ID eklendi #}
+            {% if notifications_paginated and notifications_paginated.items %}
+            <ul class="list-unstyled">
+                {% for notification in notifications_paginated.items %}
+                <li class="notification-list-item {% if not notification.okundu_mu %}unread{% endif %}">
+                    {% if notification.bildirim_tipi %}
+                    <span class="notification-type">{{ notification.bildirim_tipi | replace('_', ' ') | title }}</span>
+                    {% endif %}
+                    <a href="{{ notification.link if notification.link else '#' }}" class="text-dark message stretched-link" data-notification-id="{{ notification.id }}">
+                        {{ notification.mesaj }}
+                    </a>
+                    <div class="timestamp mt-1">
+                        {{ notification.olusturulma_tarihi.strftime('%d %B %Y, %H:%M') }}
+                        {% if not notification.okundu_mu %}
+                        <span class="badge badge-warning ml-2">Yeni</span>
+                        {% endif %}
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+
+            {% if notifications_paginated.pages > 1 %}
+            <nav aria-label="Bildirimler Sayfalaması" class="pagination-container">
+                <ul class="pagination">
+                    <li class="page-item {% if not notifications_paginated.has_prev %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for(request.endpoint, page=notifications_paginated.prev_num) if notifications_paginated.has_prev else '#_prev' }}" tabindex="-1" aria-disabled="true">Önceki</a>
+                    </li>
+                    {% for page_num in notifications_paginated.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                    {% if page_num %}
+                    <li class="page-item {% if notifications_paginated.page == page_num %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for(request.endpoint, page=page_num) }}">{{ page_num }}</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                    {% endfor %}
+                    <li class="page-item {% if not notifications_paginated.has_next %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for(request.endpoint, page=notifications_paginated.next_num) if notifications_paginated.has_next else '#_next' }}">Sonraki</a>
+                    </li>
+                </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="alert alert-info text-center">
+                Görüntülenecek bildirim bulunmamaktadır.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Tekil bildirim okundu işaretleme (base.html'den gelenle çakışmaması için kontrol edilebilir veya sadece burada olabilir)
+    const notificationLinks = document.querySelectorAll('#notificationListContainer a.message.stretched-link');
+    notificationLinks.forEach(link => {
+        link.addEventListener('click', function(event) {
+            const notificationId = this.dataset.notificationId;
+            const targetUrl = this.href;
+            const listItem = this.closest('.notification-list-item');
+
+            if (notificationId && targetUrl !== '#' && !this.classList.contains('js-notification-clicked')) {
+                this.classList.add('js-notification-clicked');
+                event.preventDefault();
+                fetch(`{{ url_for('bp_common.mark_notification_read', notification_id=0) }}`.replace('0', notificationId), {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && listItem) {
+                        listItem.classList.remove('unread');
+                        const newBadge = listItem.querySelector('.badge.badge-warning');
+                        if (newBadge) newBadge.remove();
+                    }
+                    window.location.href = targetUrl; // Her durumda linke git
+                })
+                .catch(error => {
+                    console.error("Bildirim okundu olarak işaretlenirken hata:", error);
+                    window.location.href = targetUrl; // Hata olsa bile linke git
+                });
+            } else if (targetUrl && targetUrl !== '#') {
+                // Linke git
+            } else {
+                event.preventDefault();
+            }
+        });
+    });
+
+    // Tümünü Okundu Say Butonu
+    const markAllReadButton = document.getElementById('markAllReadBtn');
+    if (markAllReadButton) {
+        markAllReadButton.addEventListener('click', function() {
+            if (!confirm("Tüm bildirimleri okundu olarak işaretlemek istediğinizden emin misiniz?")) return;
+
+            fetch("{{ url_for('bp_common.mark_all_notifications_read') }}", {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message || "Tüm bildirimler okundu olarak işaretlendi.");
+                    window.location.reload(); // Sayfayı yenile
+                } else {
+                    alert("Hata: " + (data.message || "İşlem sırasında bir sorun oluştu."));
+                }
+            })
+            .catch(error => {
+                console.error("Tümünü okundu olarak işaretlerken hata:", error);
+                alert("İşlem sırasında bir sunucu hatası oluştu.");
+            });
+        });
+    }
+
+    // Tümünü Sil Butonu
+    const deleteAllButton = document.getElementById('deleteAllBtn');
+    if (deleteAllButton) {
+        deleteAllButton.addEventListener('click', function() {
+            if (!confirm("DİKKAT: Tüm bildirimlerinizi kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.")) return;
+
+            fetch("{{ url_for('bp_common.delete_all_notifications') }}", {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message || "Tüm bildirimler silindi.");
+                    window.location.reload(); // Sayfayı yenile
+                } else {
+                    alert("Hata: " + (data.message || "İşlem sırasında bir sorun oluştu."));
+                }
+            })
+            .catch(error => {
+                console.error("Tümünü silerken hata:", error);
+                alert("İşlem sırasında bir sunucu hatası oluştu.");
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

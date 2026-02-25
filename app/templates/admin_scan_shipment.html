@@ -1,0 +1,46 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Barkod ile Kargo Bul - Admin Paneli{% endblock %}
+
+
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0 h5">Barkod ile Kargo Durumu Güncelle</h3>
+                </div>
+                <div class="card-body">
+                    <p class="card-text text-muted">Lütfen barkod okuyucu ile kargo etiketini okutun veya takip numarasını manuel olarak girip "Kargoyu Bul" butonuna basın.</p>
+                    <form method="POST" action="{{ url_for('bp_admin.scan_shipment_status') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="form-group">
+                            <label for="takip_no_scanned" class="sr-only">Okutulan/Girilen Takip Numarası:</label>
+                            <input type="text" name="takip_no_scanned" id="takip_no_scanned" class="form-control form-control-lg" placeholder="Takip Numarası" autofocus required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-lg btn-block">
+                            <i class="fas fa-search mr-1"></i> Kargoyu Bul
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    .card-header h3.h5 {
+        font-size: 1.2rem;
+    }
+
+    .form-control-lg {
+        font-size: 1.1rem;
+        text-align: center; /* Okunan numaranın ortalanması için */
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,224 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Yeni Kargo Ekle - İşletme Paneli{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h2 class="mb-0 h5">Yeni Kargo Kaydı Oluştur</h2>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('bp_business.add_shipment') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <h5 class="mt-3 mb-3 text-muted">Alıcı Bilgileri</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="alici_adi_soyadi">Alıcı Adı Soyadı (*)</label>
+                            <input type="text" id="alici_adi_soyadi" name="alici_adi_soyadi" class="form-control form-control-sm" value="{{ form_data.get('alici_adi_soyadi', '') }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="alici_telefon">Alıcı Telefon (*)</label>
+                            <input type="tel" id="alici_telefon" name="alici_telefon" class="form-control form-control-sm" value="{{ form_data.get('alici_telefon', '') }}" placeholder="Örn: +905xxxxxxxxx" required>
+                            <small class="form-text text-muted">Uluslararası E.164 formatında giriniz (örn: +905331234567).</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="alici_email">Alıcı E-posta (Bildirim için)</label>
+                            <input type="email" id="alici_email" name="alici_email" class="form-control form-control-sm" value="{{ form_data.get('alici_email', '') }}">
+                            <small class="form-text text-muted">E-posta girilirse kargo durumu hakkında bilgilendirme yapılır.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="alici_sehir">İlçe (*)</label>
+                            <select id="alici_sehir" name="alici_sehir" class="form-control form-control-sm" required>
+                                <option value="" {% if not form_data.get('alici_sehir') %}selected{% endif %} disabled>İlçe Seçiniz...</option>
+                                {% for ilce_adi in kktc_ilceler %}
+                                <option value="{{ ilce_adi }}" {% if form_data.get('alici_sehir')==ilce_adi %}selected{% endif %}>{{ ilce_adi }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="alici_ilce">Köy/Mahalle</label>
+                            <select id="alici_ilce" name="alici_ilce" class="form-control form-control-sm" disabled>
+                                <option value="">Önce İlçe Seçiniz...</option>
+                                {# JavaScript ile doldurulacak #}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="alici_adres">Alıcı Açık Adres (Sokak, Kapı No vb.) (*)</label>
+                    <textarea id="alici_adres" name="alici_adres" class="form-control form-control-sm" rows="2" required placeholder="Sokak adı, bina adı/no, daire no vb.">{{ form_data.get('alici_adres', '') }}</textarea>
+                </div>
+
+
+                <hr class="my-4">
+                <h5 class="mt-3 mb-3 text-muted">Finansal Bilgiler ve Kargo Detayları</h5>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="urun_bedeli_alici_tahsil">Ürün Bedeli (Alıcıdan Tahsil) (*)</label>
+                            <input type="number" id="urun_bedeli_alici_tahsil" name="urun_bedeli_alici_tahsil" class="form-control form-control-sm" step="0.01" min="0" value="{{ form_data.get('urun_bedeli_alici_tahsil', '0.00') }}" required>
+                            <small class="form-text text-muted">Son kullanıcıdan tahsil edilecek ürünün fiyatı. Bedelsizse 0 girin.</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="kargo_ucreti_alici_tahsil">Kargo Ücreti (Alıcıdan Tahsil Edilecekse)</label>
+                            <input type="number" id="kargo_ucreti_alici_tahsil" name="kargo_ucreti_alici_tahsil" class="form-control form-control-sm" step="0.01" min="0" value="{{ form_data.get('kargo_ucreti_alici_tahsil', '0.00') }}">
+                            <small class="form-text text-muted">Alıcıdan ayrıca kargo ücreti tahsil edilecekse girin. Yoksa 0 bırakın.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="odeme_yontemi_teslimde">Ödeme Yöntemi (Teslimde) (*)</label>
+                            <select id="odeme_yontemi_teslimde" name="odeme_yontemi_teslimde" class="form-control form-control-sm" required>
+                                <option value="" {% if not form_data.get('odeme_yontemi_teslimde') %}selected disabled{% else %}disabled{% endif %}>Seçiniz...</option>
+                                <option value="Online / Havale" {% if form_data.get('odeme_yontemi_teslimde')=='Online / Havale' %}selected{% endif %}>Online / Havale (Müşteri Satıcıya Ödedi)</option>
+                                <option value="Kapıda Nakit" {% if form_data.get('odeme_yontemi_teslimde')=='Kapıda Nakit' %}selected{% endif %}>Kapıda Nakit (Kargo Tahsil Edecek)</option>
+                                <option value="Kapıda Kredi Kartı" {% if form_data.get('odeme_yontemi_teslimde')=='Kapıda Kredi Kartı' %}selected{% endif %}>Kapıda Kredi Kartı (Satıcı POS)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="kargo_durumu">Başlangıç Kargo Durumu (*)</label>
+                            <select id="kargo_durumu" name="kargo_durumu" class="form-control form-control-sm" required>
+                                {% for durum in isletme_baslangic_durumlari %}
+                                <option value="{{ durum.value }}"
+                                        {% if form_data.get('kargo_durumu', KargoDurumEnum.HAZIRLANIYOR.value)==durum.value %}selected{% endif %}>
+                                    {{ durum.value }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">Kargonun mevcut başlangıç durumunu seçin.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="ozel_not">Özel Not (Kargo Elemanı İçin)</label>
+                    <textarea id="ozel_not" name="ozel_not" class="form-control form-control-sm" rows="2">{{ form_data.get('ozel_not', '') }}</textarea>
+                </div>
+
+                <hr class="my-4">
+                <p class="text-muted"><small>(*) ile işaretli alanlar zorunludur.</small></p>
+                <div class="form-group text-right">
+                    <a href="{{ url_for('bp_business.dashboard') }}" class="btn btn-outline-secondary mr-2">
+                        <i class="fas fa-times mr-1"></i> İptal Et
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save mr-1"></i> Kargoyu Kaydet
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+<style>
+    .card-header h2.h5 {
+        font-size: 1.25rem;
+        font-weight: 500;
+    }
+
+    .form-group label {
+        font-weight: 500;
+        font-size: 0.85rem;
+        margin-bottom: .2rem;
+    }
+
+    .form-control-sm {
+        font-size: 0.85rem;
+        height: calc(1.5em + .5rem + 2px);
+    }
+
+    hr.my-4 {
+        margin-top: 1.5rem !important;
+        margin-bottom: 1.5rem !important;
+    }
+
+    h5.text-muted {
+        font-size: 1.1rem;
+    }
+</style>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ilceSelect = document.getElementById('alici_sehir'); // Bu 'İlçe' dropdown'ı
+    const koySelect = document.getElementById('alici_ilce');  // Bu 'Köy/Mahalle' dropdown'ı
+
+    let kktcData = {};
+    try {
+        // Flask'tan gelen JSON string'ini güvenli bir şekilde parse et
+        // Jinja'da tojson filtresi string'i JavaScript için uygun hale getirir (tırnaklar vs.)
+        // safe filtresi ise Flask'ın otomatik HTML escape etmesini engeller.
+        kktcData = JSON.parse({{ kktc_konumlar_json | tojson | safe }});
+    } catch (e) {
+        console.error("KKTC konum verisi parse edilirken hata:", e);
+        // Hata durumunda kullanıcıya bilgi verilebilir veya loglanabilir.
+    }
+
+    // Sayfa yüklendiğinde, eğer form_data'dan gelen bir ilçe varsa (yani form validasyon hatası sonrası geri dönüldüyse),
+    // o ilçeye ait köyleri yükle ve seçili köyü işaretle.
+    const initialIlce = ilceSelect.value;
+    const initialKoy = "{{ form_data.get('alici_ilce', '') }}";
+
+    function populateKoyler(selectedIlce, preSelectedKoy) {
+        koySelect.innerHTML = ''; // Önceki seçenekleri temizle
+        koySelect.disabled = true;
+
+        if (selectedIlce && kktcData[selectedIlce]) {
+            koySelect.disabled = false;
+            let defaultOption = new Option('Köy/Mahalle Seçiniz...', '');
+            koySelect.add(defaultOption);
+
+            kktcData[selectedIlce].forEach(function(koy) {
+                const option = new Option(koy, koy);
+                if (koy === preSelectedKoy) {
+                    option.selected = true;
+                }
+                koySelect.add(option);
+            });
+        } else {
+            koySelect.innerHTML = '<option value="">Önce İlçe Seçiniz...</option>';
+            koySelect.disabled = true;
+        }
+    }
+
+    if (initialIlce) {
+        populateKoyler(initialIlce, initialKoy);
+    }
+
+
+    ilceSelect.addEventListener('change', function() {
+        populateKoyler(this.value, null); // İlçe değiştiğinde önceden seçili köy olmaz.
+    });
+});
+</script>
+{% endblock %}
