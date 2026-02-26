@@ -40,7 +40,8 @@ class Config:
     # ------------------------
     # SECRET_KEY (P0 - kritik)
     # ------------------------
-    _secret = _env_str("SECRET_KEY", "")
+    # Eğer dışarıdan bir anahtar verilmezse, çökmemesi için varsayılan bir anahtar belirledik.
+    _secret = _env_str("SECRET_KEY", "beecargo_sabit_gizli_anahtar_2026_xyz")
     if _secret:
         SECRET_KEY = _secret
     else:

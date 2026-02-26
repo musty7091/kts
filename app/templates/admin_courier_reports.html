@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Kurye Gün Sonu Raporları{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-motorcycle text-primary"></i> Kurye Gün Sonu ve Performans Raporları</h2>
+        <a href="{{ url_for('bp_admin.dashboard') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Panele Dön
+        </a>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">Rapor Tarihi Seçin</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('bp_admin.courier_reports') }}" class="row g-3 align-items-end">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
+                <div class="col-md-4">
+                    <label for="start_date" class="form-label fw-bold">Başlangıç Tarihi</label>
+                    <input type="date" class="form-control" id="start_date" name="start_date" value="{{ form_dates.start_date }}" required>
+                </div>
+                
+                <div class="col-md-4">
+                    <label for="end_date" class="form-label fw-bold">Bitiş Tarihi</label>
+                    <input type="date" class="form-control" id="end_date" name="end_date" value="{{ form_dates.end_date }}" required>
+                </div>
+                
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search"></i> Raporu Getir
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if report_data is not none %}
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Kurye Tahsilat ve Teslimat Sonuçları</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if report_data|length > 0 %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped mb-0 text-center align-middle">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th class="text-start ps-4">Kurye Adı Soyadı</th>
+                                    <th>Teslim Edilen Kargo</th>
+                                    <th class="text-success">Getirmesi Gereken Nakit</th>
+                                    <th class="text-info">Çekilen Kredi Kartı (POS)</th>
+                                    <th class="text-warning">Kuryenin Toplam Hasılatı</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% set ns = namespace(toplam_kargo=0, toplam_nakit=0, toplam_kk=0) %}
+                                
+                                {% for satir in report_data %}
+                                    {% set ns.toplam_kargo = ns.toplam_kargo + satir.toplam_teslimat %}
+                                    {% set ns.toplam_nakit = ns.toplam_nakit + satir.nakit_tahsilat %}
+                                    {% set ns.toplam_kk = ns.toplam_kk + satir.kk_tahsilat %}
+                                    
+                                    <tr>
+                                        <td class="text-start ps-4 fw-bold">{{ satir.kurye_ad_soyad }}</td>
+                                        <td>
+                                            <span class="badge bg-secondary fs-6">{{ satir.toplam_teslimat }} Adet</span>
+                                        </td>
+                                        <td class="text-success fw-bold">{{ "%.2f"|format(satir.nakit_tahsilat) }} TL</td>
+                                        <td class="text-info fw-bold">{{ "%.2f"|format(satir.kk_tahsilat) }} TL</td>
+                                        <td class="text-warning fw-bold">{{ "%.2f"|format(satir.nakit_tahsilat + satir.kk_tahsilat) }} TL</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr class="fs-5">
+                                    <td class="text-end fw-bold pe-3">GENEL TOPLAM:</td>
+                                    <td class="fw-bold">{{ ns.toplam_kargo }} Adet</td>
+                                    <td class="text-success fw-bold">{{ "%.2f"|format(ns.toplam_nakit) }} TL</td>
+                                    <td class="text-info fw-bold">{{ "%.2f"|format(ns.toplam_kk) }} TL</td>
+                                    <td class="text-warning fw-bold">{{ "%.2f"|format(ns.toplam_nakit + ns.toplam_kk) }} TL</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info m-4 text-center">
+                        <i class="fas fa-info-circle fs-4 mb-2"></i><br>
+                        Seçtiğiniz tarih aralığında hiçbir kurye tarafından teslim edilmiş kargo kaydı bulunamadı.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

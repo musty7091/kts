@@ -24,14 +24,15 @@
                 <li class="nav-item {% if 'all_shipments' in current_endpoint or ('shipment_details' in current_endpoint and 'admin' in current_endpoint) %}active{% endif %}">
                     <a class="nav-link" href="{{ url_for('bp_admin.all_shipments') }}">Tüm Kargolar</a>
                 </li>
-                <li class="nav-item dropdown {% if current_endpoint in ['bp_admin.add_business', 'bp_admin.isletme_bakiyeleri', 'bp_admin.reports', 'bp_admin.scan_shipment_status', 'bp_admin.add_courier', 'bp_admin.list_couriers'] %}active{% endif %}">
+                <li class="nav-item dropdown {% if current_endpoint in ['bp_admin.add_business', 'bp_admin.isletme_bakiyeleri', 'bp_admin.reports', 'bp_admin.courier_reports', 'bp_admin.scan_shipment_status', 'bp_admin.add_courier', 'bp_admin.list_couriers'] %}active{% endif %}">
                     <a class="nav-link dropdown-toggle" href="#" id="adminMoreLinks" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         Yönetim
                     </a>
                     <div class="dropdown-menu" aria-labelledby="adminMoreLinks">
                         <a class="dropdown-item {% if current_endpoint == 'bp_admin.add_business' %}active{% endif %}" href="{{ url_for('bp_admin.add_business') }}">İşletme Ekle</a>
                         <a class="dropdown-item {% if current_endpoint == 'bp_admin.isletme_bakiyeleri' %}active{% endif %}" href="{{ url_for('bp_admin.isletme_bakiyeleri') }}">Bakiyeler</a>
-                        <a class="dropdown-item {% if current_endpoint == 'bp_admin.reports' %}active{% endif %}" href="{{ url_for('bp_admin.reports') }}">Raporlar</a>
+                        <a class="dropdown-item {% if current_endpoint == 'bp_admin.reports' %}active{% endif %}" href="{{ url_for('bp_admin.reports') }}">Genel Raporlar</a>
+                        <a class="dropdown-item {% if current_endpoint == 'bp_admin.courier_reports' %}active{% endif %}" href="{{ url_for('bp_admin.courier_reports') }}">Kurye Raporları</a>
                         <a class="dropdown-item {% if current_endpoint == 'bp_admin.scan_shipment_status' %}active{% endif %}" href="{{ url_for('bp_admin.scan_shipment_status') }}">Barkod Bul</a>
                         <div class="dropdown-divider"></div>
                         <h6 class="dropdown-header">Kurye Yönetimi</h6>

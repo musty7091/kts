@@ -14,10 +14,6 @@ import re
 
 bp_admin = Blueprint('bp_admin', __name__, template_folder='templates', url_prefix='/admin')
 
-# --- Diğer route fonksiyonları burada yer alıyor (login, dashboard, logout, add_business, edit_business vb.) ---
-# Bu fonksiyonlar önceki yanıtlarda verildiği gibi kalacak.
-# Sadece 'settings' fonksiyonu güncellenecek.
-
 @bp_admin.route('/login', methods=['GET', 'POST'])
 def login():
     if 'admin_id' in session:
@@ -27,7 +23,6 @@ def login():
         sifre = request.form.get('sifre')
         admin = AdminKullanicilar.query.filter_by(kullanici_adi=kullanici_adi).first()
         if admin and check_password_hash(admin.sifre_hash, sifre):
-            # P0: Session fixation azaltma - yeni oturum başlat
             session.clear()
             session.permanent = True
 
@@ -39,7 +34,6 @@ def login():
             flash('Kullanıcı adı veya şifre hatalı.', 'error')
             return redirect(url_for('bp_admin.login'))
     return render_template('login.html')
-
 
 @bp_admin.route('/dashboard')
 def dashboard():
@@ -73,10 +67,8 @@ def dashboard():
 
     return render_template('admin_dashboard.html', isletmeler_data=isletmeler_listesi)
 
-
 @bp_admin.route('/logout')
 def logout():
-    # P0: Oturum temizliği (tüm session verilerini kapat)
     session.clear()
     flash('Başarıyla çıkış yaptınız.', 'success')
     return redirect(url_for('bp_common.index'))
@@ -126,6 +118,18 @@ def add_business():
             flash(f"'{normalized_isletme_telefon}' telefon numarası zaten başka bir işletme tarafından kullanılıyor.", "error")
             return render_template('admin_add_business.html', form_data=form_data_on_error)
 
+        # Şifre Güvenlik Kontrolü
+        errors = []
+        if len(sifre) < 8: errors.append("Şifre en az 8 karakter olmalıdır.")
+        if not re.search(r"[A-Z]", sifre): errors.append("Şifre en az bir büyük harf içermelidir.")
+        if not re.search(r"[a-z]", sifre): errors.append("Şifre en az bir küçük harf içermelidir.")
+        if not re.search(r"[0-9]", sifre): errors.append("Şifre en az bir rakam içermelidir.")
+        if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?~`]", sifre): errors.append("Şifre en az bir özel karakter içermelidir.")
+        
+        if errors:
+            for error_msg in errors: flash(error_msg, 'error')
+            return render_template('admin_add_business.html', form_data=form_data_on_error)
+
         hashed_sifre = generate_password_hash(sifre)
         yeni_isletme = Isletmeler(
             isletme_adi=isletme_adi, isletme_kodu=isletme_kodu, kullanici_adi=kullanici_adi,
@@ -145,7 +149,6 @@ def add_business():
             return render_template('admin_add_business.html', form_data=form_data_on_error)
 
     return render_template('admin_add_business.html', form_data=form_data_on_error)
-
 
 @bp_admin.route('/edit_business/<int:isletme_id>', methods=['GET', 'POST'])
 def edit_business(isletme_id):
@@ -252,6 +255,18 @@ def add_courier():
             flash(f"'{normalized_telefon}' telefon numarası zaten başka bir kurye tarafından kullanılıyor.", 'error')
             return render_template('admin_add_courier.html', form_data=form_data_on_error)
 
+        # Şifre Güvenlik Kontrolü
+        errors = []
+        if len(sifre) < 8: errors.append("Şifre en az 8 karakter olmalıdır.")
+        if not re.search(r"[A-Z]", sifre): errors.append("Şifre en az bir büyük harf içermelidir.")
+        if not re.search(r"[a-z]", sifre): errors.append("Şifre en az bir küçük harf içermelidir.")
+        if not re.search(r"[0-9]", sifre): errors.append("Şifre en az bir rakam içermelidir.")
+        if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?~`]", sifre): errors.append("Şifre en az bir özel karakter içermelidir.")
+        
+        if errors:
+            for error_msg in errors: flash(error_msg, 'error')
+            return render_template('admin_add_courier.html', form_data=form_data_on_error)
+
         yeni_kurye = Kuryeler(
             ad_soyad=ad_soyad,
             kullanici_adi=kullanici_adi,
@@ -333,6 +348,19 @@ def edit_courier(kurye_id):
             if yeni_sifre != yeni_sifre_tekrar:
                 flash('Yeni girilen şifreler eşleşmiyor.', 'error')
                 return render_template('admin_edit_courier.html', kurye=kurye_to_edit, form_data=form_data_on_error)
+            
+            # Şifre Güvenlik Kontrolü
+            errors = []
+            if len(yeni_sifre) < 8: errors.append("Yeni şifre en az 8 karakter olmalıdır.")
+            if not re.search(r"[A-Z]", yeni_sifre): errors.append("Yeni şifre en az bir büyük harf içermelidir.")
+            if not re.search(r"[a-z]", yeni_sifre): errors.append("Yeni şifre en az bir küçük harf içermelidir.")
+            if not re.search(r"[0-9]", yeni_sifre): errors.append("Yeni şifre en az bir rakam içermelidir.")
+            if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?~`]", yeni_sifre): errors.append("Yeni şifre en az bir özel karakter içermelidir.")
+            
+            if errors:
+                for error_msg in errors: flash(error_msg, 'error')
+                return render_template('admin_edit_courier.html', kurye=kurye_to_edit, form_data=form_data_on_error)
+
             kurye_to_edit.set_password(yeni_sifre)
             flash('Kurye şifresi başarıyla güncellendi.', 'info')
 
@@ -344,18 +372,13 @@ def edit_courier(kurye_id):
             db.session.rollback()
             flash(f"Kurye bilgileri güncellenirken bir hata oluştu: {str(e)}", "error")
             current_app.logger.error(f"Kurye düzenleme hatası (ID: {kurye_id}): {e}", exc_info=True)
-            # Hata durumunda, güncellenmeye çalışılan kurye nesnesi ve form verileriyle template'i tekrar render et
             return render_template('admin_edit_courier.html', kurye=kurye_to_edit, form_data=form_data_on_error)
 
-    # GET request için form_data'yı kurye bilgileriyle doldur
-    # Bu, POST hatası olmadığında veya sayfa ilk yüklendiğinde çalışır.
-    # Eğer request.form doluysa (yani POST sonrası bir hata ile gelinmişse), o değerler kullanılır.
-    # Değilse, kurye nesnesinden gelen değerler kullanılır.
     get_form_data = {
         'ad_soyad': kurye_to_edit.ad_soyad,
         'telefon': kurye_to_edit.telefon,
-        'email': kurye_to_edit.email or '', # None ise boş string
-        'aktif_mi': str(kurye_to_edit.aktif_mi) # String'e çevir
+        'email': kurye_to_edit.email or '', 
+        'aktif_mi': str(kurye_to_edit.aktif_mi) 
     }
     return render_template('admin_edit_courier.html', kurye=kurye_to_edit, form_data=get_form_data)
 
@@ -368,7 +391,6 @@ def settings():
     current_admin_user = AdminKullanicilar.query.get(session['admin_id'])
     if not current_admin_user: 
         flash('Admin kullanıcı bilgileri bulunamadı. Lütfen tekrar giriş yapın.', 'error')
-        # P0: Oturum temizliği
         session.clear()
         return redirect(url_for('bp_admin.login'))
 
@@ -384,7 +406,7 @@ def settings():
             current_app.logger.error(f"Ayarlar getirme hatası: {e}", exc_info=True)
         return ayarlar_s
 
-    password_form_data = {} # Şifre formu için hata durumunda verileri tutar
+    password_form_data = {} 
 
     if request.method == 'POST':
         action = request.form.get('action') 
@@ -402,7 +424,6 @@ def settings():
                         kargo_ucret_ayari.guncellenme_tarihi = datetime.now()
                     except InvalidOperation:
                         flash("Geçersiz sabit kargo ücreti formatı! Pozitif bir sayı girin (örn: 100.00).", "error")
-                        # Hata durumunda, şifre formu verilerini de koruyarak render et
                         return render_template('admin_settings.html', ayarlar=get_settings_dict(), current_admin=current_admin_user, password_form_data=password_form_data)
                 
                 db.session.commit()
@@ -411,12 +432,10 @@ def settings():
                 db.session.rollback()
                 flash(f"Sistem ayarları güncellenirken bir hata oluştu: {str(e)}", 'error')
                 current_app.logger.error(f"Sistem ayarları güncelleme hatası: {e}", exc_info=True)
-            # Sistem ayarları güncellendikten sonra sayfayı tekrar render et (şifre formu verileriyle birlikte)
             return render_template('admin_settings.html', ayarlar=get_settings_dict(), current_admin=current_admin_user, password_form_data=password_form_data)
 
-
         elif action == 'change_admin_password':
-            password_form_data = request.form # Form verilerini al
+            password_form_data = request.form 
             current_password = request.form.get('current_password')
             new_password = request.form.get('new_password')
             confirm_new_password = request.form.get('confirm_new_password')
@@ -427,25 +446,24 @@ def settings():
                 flash('Mevcut şifreniz yanlış.', 'danger')
             elif new_password != confirm_new_password:
                 flash('Yeni şifreler eşleşmiyor.', 'danger')
-                # Sadece current_password'ı koru, yeni şifre alanlarını temizle
                 password_form_data = {'current_password': current_password} 
             else:
+                # Şifre Güvenlik Kontrolü
                 errors = []
-                if len(new_password) < 8: 
-                    errors.append("Yeni şifre en az 8 karakter olmalıdır.")
-                # Diğer şifre karmaşıklığı kuralları buraya eklenebilir (büyük harf, küçük harf, rakam, özel karakter vb.)
+                if len(new_password) < 8: errors.append("Yeni şifre en az 8 karakter olmalıdır.")
+                if not re.search(r"[A-Z]", new_password): errors.append("Yeni şifre en az bir büyük harf içermelidir.")
+                if not re.search(r"[a-z]", new_password): errors.append("Yeni şifre en az bir küçük harf içermelidir.")
+                if not re.search(r"[0-9]", new_password): errors.append("Yeni şifre en az bir rakam içermelidir.")
+                if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?~`]", new_password): errors.append("Yeni şifre en az bir özel karakter içermelidir.")
 
                 if errors:
                     for error_msg in errors:
                         flash(error_msg, 'danger')
-                    # Hatalı durumda current_password'ı koru
                     password_form_data = {'current_password': current_password}
                 else:
                     try:
                         current_admin_user.sifre_hash = generate_password_hash(new_password)
                         db.session.commit()
-                        # Şifre başarıyla değiştirildi, oturumu sonlandır ve giriş sayfasına yönlendir
-                        # P0: Şifre değişince oturumu kapat (session fixation/hijyen)
                         session.clear()
                         flash('Admin şifreniz başarıyla güncellendi! Güvenlik nedeniyle tekrar giriş yapmanız gerekmektedir.', 'success')
                         return redirect(url_for('bp_admin.login')) 
@@ -453,19 +471,13 @@ def settings():
                         db.session.rollback()
                         flash(f'Admin şifresi güncellenirken bir hata oluştu: {str(e)}', 'error')
                         current_app.logger.error(f"Admin şifre güncelleme hatası (Admin ID: {current_admin_user.id}): {e}", exc_info=True)
-                        # Hata durumunda current_password'ı koru
                         password_form_data = {'current_password': current_password} 
             
-            # Şifre formuyla ilgili bir işlem yapıldıysa (başarılı veya hatalı), sayfayı tekrar render et
-            # password_form_data, hatalı girişlerde veya başarılı olmayan denemelerde alanları dolu tutar.
             return render_template('admin_settings.html', ayarlar=get_settings_dict(), current_admin=current_admin_user, password_form_data=password_form_data)
 
-    # GET request için veya form gönderimi yoksa
     ayarlar_dict = get_settings_dict()
     return render_template('admin_settings.html', ayarlar=ayarlar_dict, current_admin=current_admin_user, password_form_data=password_form_data)
 
-# --- Diğer admin route'ları (all_shipments, update_shipment_status, assign_courier, reports, vb.) burada devam eder ---
-# Bu fonksiyonlar önceki yanıtlarda verildiği gibi kalacak.
 @bp_admin.route('/all_shipments')
 def all_shipments():
     if 'admin_id' not in session:
@@ -651,7 +663,6 @@ def assign_courier(kargo_id):
         if not selected_kurye_id_str or selected_kurye_id_str == "0": 
             if selected_kurye_id_str == "0": 
                 if kargo.kurye_id:
-                    # eski_kurye_id = kargo.kurye_id # Bu değişkene gerek yok
                     kargo.kurye_id = None
                     db.session.commit()
                     flash(f"'{kargo.takip_numarasi}' numaralı kargonun kurye ataması kaldırıldı.", 'info')
@@ -719,7 +730,7 @@ def reports():
             
             if start_date_obj > end_date_obj:
                 flash('Başlangıç tarihi, bitiş tarihinden sonra olamaz.', 'error')
-                report_data = {} # Hata durumunda boş rapor verisi
+                report_data = {} 
             else:
                 report_data = {'isletme_reports': []}
 
@@ -736,9 +747,6 @@ def reports():
                 report_data['delivered_shipments_count'] = teslim_edilmis_kargolar_sorgusu.count()
                 
                 toplam_kazanilan_hizmet_bedeli_genel = Decimal('0.00')
-                # calculate_business_earnings fonksiyonu zaten bu mantığı içeriyor,
-                # ancak burada genel toplam için tekrar hesaplama yapılmış.
-                # Bu kısım optimize edilebilir veya olduğu gibi bırakılabilir.
                 sabit_kargo_ayari_rpt = Ayarlar.query.filter_by(ayar_adi='sabit_kargo_hizmet_bedeli').first()
                 standart_hizmet_bedeli_rpt = Decimal(sabit_kargo_ayari_rpt.ayar_degeri) if sabit_kargo_ayari_rpt and sabit_kargo_ayari_rpt.ayar_degeri else Decimal('100.00')
 
@@ -779,7 +787,6 @@ def reports():
                         end_date=end_date_obj
                     )
                     
-                    # Sadece ilgili tarih aralığında aktivitesi olan işletmeleri rapora dahil et
                     if isletme_total_created_rpt > 0 or isletme_total_delivered_rpt > 0 or isletme_service_fee_earned_hesaplanan_rpt > 0:
                         report_data['isletme_reports'].append({
                             'name': isletme_rpt.isletme_adi,
@@ -790,23 +797,94 @@ def reports():
                         })
         except ValueError:
             flash('Geçersiz tarih formatı. Lütfen २०२२-AA-GG formatında girin.', 'error')
-            report_data = {} # Hata durumunda boş rapor verisi
+            report_data = {} 
         except Exception as e:
             flash(f'Rapor oluşturulurken bir hata meydana geldi: {str(e)}', 'error')
             current_app.logger.error(f"Raporlama hatası: {e}", exc_info=True)
-            report_data = {} # Hata durumunda boş rapor verisi
+            report_data = {} 
     
-    elif request.method == 'POST' and (not start_date_str or not end_date_str) : # Form gönderildi ama tarihler boş
+    elif request.method == 'POST' and (not start_date_str or not end_date_str) : 
             flash('Rapor oluşturmak için lütfen başlangıç ve bitiş tarihlerini seçin.', 'warning')
-            report_data = {} # Boş rapor verisi
+            report_data = {} 
 
-    # Template'e gönderilecek form tarihleri (sayfa yenilendiğinde inputlarda kalması için)
     form_dates_for_template = {
         'start_date': start_date_str if start_date_str else '',
         'end_date': end_date_str if end_date_str else ''
     }
     
     return render_template('admin_reports.html', report_data=report_data, form_dates=form_dates_for_template)
+
+@bp_admin.route('/courier_reports', methods=['GET', 'POST'])
+def courier_reports():
+    if 'admin_id' not in session:
+        flash('Bu sayfayı görüntülemek için giriş yapmalısınız.', 'error')
+        return redirect(url_for('bp_admin.login'))
+
+    report_data = None
+    start_date_str = request.form.get('start_date') if request.method == 'POST' else request.args.get('start_date')
+    end_date_str = request.form.get('end_date') if request.method == 'POST' else request.args.get('end_date')
+    
+    # Eğer herhangi bir tarih girilmemişse otomatik olarak bugünü baz alalım ki her akşam kolayca kontrol edebil.
+    if not start_date_str or not end_date_str:
+        bugun_str = date.today().strftime('%Y-%m-%d')
+        start_date_str = bugun_str
+        end_date_str = bugun_str
+
+    try:
+        start_date_obj = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date_obj = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        
+        if start_date_obj > end_date_obj:
+            flash('Başlangıç tarihi, bitiş tarihinden sonra olamaz.', 'error')
+            report_data = [] 
+        else:
+            report_data = []
+            kuryeler = Kuryeler.query.order_by(Kuryeler.ad_soyad).all()
+            
+            for kurye in kuryeler:
+                # Kuryenin belirtilen tarihlerde tamamen "Teslim Ettiği" kargoları buluyoruz
+                teslim_edilenler = Kargolar.query.filter(
+                    Kargolar.kurye_id == kurye.id,
+                    Kargolar.kargo_durumu == KargoDurumEnum.TESLIM_EDILDI,
+                    Kargolar.teslim_tarihi >= datetime.combine(start_date_obj, datetime.min.time()),
+                    Kargolar.teslim_tarihi <= datetime.combine(end_date_obj, datetime.max.time())
+                ).all()
+
+                toplam_teslimat = len(teslim_edilenler)
+                nakit_tahsilat = Decimal('0.00')
+                kk_tahsilat = Decimal('0.00')
+
+                # Teslim edilen her bir kargoyu tek tek gezip hesaplıyoruz
+                for kargo in teslim_edilenler:
+                    tahsil_edilecek_tutar = kargo.toplam_tahsil_edilecek_alici or Decimal('0.00')
+                    
+                    if kargo.odeme_yontemi_teslimde == "Kapıda Nakit":
+                        nakit_tahsilat += tahsil_edilecek_tutar
+                    elif kargo.odeme_yontemi_teslimde == "Kapıda Kredi Kartı":
+                        kk_tahsilat += tahsil_edilecek_tutar
+                
+                # Listeyi kalabalık etmemesi için sadece o gün teslimat yapan kuryeleri ekrana basıyoruz
+                if toplam_teslimat > 0:
+                    report_data.append({
+                        'kurye_ad_soyad': kurye.ad_soyad,
+                        'toplam_teslimat': toplam_teslimat,
+                        'nakit_tahsilat': nakit_tahsilat,
+                        'kk_tahsilat': kk_tahsilat
+                    })
+    except ValueError:
+        flash('Geçersiz tarih formatı. Lütfen YYYY-AA-GG formatında girin.', 'error')
+        report_data = []
+    except Exception as e:
+        flash(f'Rapor oluşturulurken bir hata meydana geldi: {str(e)}', 'error')
+        current_app.logger.error(f"Kurye raporlama hatası: {e}", exc_info=True)
+        report_data = []
+
+    form_dates_for_template = {
+        'start_date': start_date_str,
+        'end_date': end_date_str
+    }
+    
+    return render_template('admin_courier_reports.html', report_data=report_data, form_dates=form_dates_for_template)
 
 @bp_admin.route('/isletme_bakiyeleri')
 def isletme_bakiyeleri():
@@ -829,23 +907,20 @@ def isletme_bakiyeleri():
     try:
         aktif_isletmeler = isletme_query.order_by(Isletmeler.isletme_adi).all()
         for isletme_obj_bakiye in aktif_isletmeler:
-            # İşletmenin brüt alacağı (sadece kapıda nakit ve ürün bedeli olanlardan)
             brut_isletme_alacagi_kargolardan = db.session.query(
-                func.sum(Kargolar.isletmeye_aktarilacak_tutar) # Bu zaten ürün bedelini (veya 0'ı) tutuyor
+                func.sum(Kargolar.isletmeye_aktarilacak_tutar) 
             ).filter(
                 Kargolar.isletme_id == isletme_obj_bakiye.id,
                 Kargolar.kargo_durumu == KargoDurumEnum.TESLIM_EDILDI,
-                Kargolar.isletmeye_aktarildi_mi == False # Henüz mahsuplaşmamış olanlar
-                # Odeme yöntemi kontrolüne gerek yok, isletmeye_aktarilacak_tutar zaten ona göre hesaplanıyor.
+                Kargolar.isletmeye_aktarildi_mi == False 
             ).scalar() or Decimal('0.00')
 
-            # İşletmenin toplam hizmet bedeli borcu (teslim edilmiş ve mahsuplaşmamış tüm kargolardan)
             toplam_hizmet_bedeli_borcu_isletmenin = db.session.query(
                 func.sum(Kargolar.kargo_ucreti_isletme_borcu)
             ).filter(
                 Kargolar.isletme_id == isletme_obj_bakiye.id,
                 Kargolar.kargo_durumu == KargoDurumEnum.TESLIM_EDILDI,
-                Kargolar.isletmeye_aktarildi_mi == False # Henüz mahsuplaşmamış olanlar
+                Kargolar.isletmeye_aktarildi_mi == False 
             ).scalar() or Decimal('0.00')
             
             yapilmis_odemeler_toplami = db.session.query(
@@ -871,7 +946,7 @@ def isletme_bakiyeleri():
 
             isletme_verileri_liste.append({
                 'isletme': isletme_obj_bakiye,
-                'toplam_alacak_veya_borc': net_bakiye_guncel # Güncellenmiş bakiye hesabı
+                'toplam_alacak_veya_borc': net_bakiye_guncel 
             })
     except Exception as e:
         current_app.logger.error(f"İşletme bakiyeleri getirilirken hata: {str(e)}", exc_info=True)
@@ -900,13 +975,13 @@ def record_payment(isletme_id):
             isletmenin_alacagi_bu_kargodan_brut = kargo_db_item.isletmeye_aktarilacak_tutar
             isletmenin_borcu_bu_kargodan_hizmet = kargo_db_item.kargo_ucreti_isletme_borcu
             bu_kargonun_kendi_icindeki_net_etkisi = isletmenin_alacagi_bu_kargodan_brut - isletmenin_borcu_bu_kargodan_hizmet
-            kümülatif_bakiye_satir_icin += bu_kargonun_kendi_icindeki_net_etkisi # Bu, her satır için artan kümülatif toplamı hesaplar
+            kümülatif_bakiye_satir_icin += bu_kargonun_kendi_icindeki_net_etkisi 
             
             kargolar_data_template.append({
                 'kargo_nesnesi': kargo_db_item,
                 'isletme_alacak_gosterilecek': isletmenin_alacagi_bu_kargodan_brut,
                 'isletme_borc_gosterilecek': isletmenin_borcu_bu_kargodan_hizmet,
-                'kümülatif_bakiye_satirda': kümülatif_bakiye_satir_icin, # BU ANAHTAR EKLENİYOR
+                'kümülatif_bakiye_satirda': kümülatif_bakiye_satir_icin, 
                 'bu_satirin_net_etkisi_checkbox': bu_kargonun_kendi_icindeki_net_etkisi
             })
         
