@@ -9,6 +9,7 @@ import json # kktc_konumlar için json.dumps kullanılacaksa (routes tarafında 
 from flask_mail import Message
 from threading import Thread
 from functools import wraps
+from itsdangerous import URLSafeTimedSerializer
 
 # --- YENİ EKLENEN YETKİLENDİRME KORUYUCULARI (P1 - Merkezi Auth) ---
 
@@ -186,6 +187,25 @@ def send_email_notification(recipient_email, subject, template_name, **kwargs):
     except Exception as e:
         current_app.logger.error(f"E-posta ({recipient_email}) gönderimi sırasında genel hata: {e}", exc_info=True)
         return False
+
+def generate_reset_token(email, user_type):
+    """Şifre sıfırlama için güvenli ve süreli bir token oluşturur."""
+    serializer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+    # Token içinde hem e-postayı hem de kullanıcı tipini saklıyoruz
+    return serializer.dumps({'email': email, 'user_type': user_type}, salt='password-reset-salt')
+
+def verify_reset_token(token, expiration=1800):
+    """Token'ı doğrular ve içindeki veriyi döner (30 dakika geçerli)."""
+    serializer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+    try:
+        data = serializer.loads(
+            token,
+            salt='password-reset-salt',
+            max_age=expiration
+        )
+        return data # {'email': '...', 'user_type': '...'}
+    except:
+        return None
 
 def calculate_business_earnings(isletme_id, start_date=None, end_date=None):
     """

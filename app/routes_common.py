@@ -18,6 +18,8 @@ import re
 
 from barcode import Code128
 from barcode.writer import ImageWriter
+from .utils import generate_reset_token, verify_reset_token, send_email_notification
+from werkzeug.security import generate_password_hash
 
 bp_common = Blueprint('bp_common', __name__, template_folder='templates')
 
@@ -377,6 +379,87 @@ def generate_payment_statement_pdf(odeme_id):
              return redirect(url_for('bp_admin.business_payment_history', isletme_id=odeme_obj.isletme_id))
         return redirect(url_for('bp_admin.isletme_bakiyeleri'))
 
+
+@bp_common.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        user_type = request.form.get('user_type') # 'admin', 'isletme' veya 'kurye'
+
+        # Kullanıcıyı veritabanında ara
+        user = None
+        if user_type == 'admin':
+            user = AdminKullanicilar.query.filter_by(email=email).first()
+        elif user_type == 'isletme':
+            user = Isletmeler.query.filter_by(isletme_email=email).first()
+        elif user_type == 'kurye':
+            user = Kuryeler.query.filter_by(email=email).first()
+
+        if user:
+            token = generate_reset_token(email, user_type)
+            reset_url = url_for('bp_common.reset_password', token=token, _external=True)
+            
+            # E-posta gönder (Şablonu bir sonraki adımda oluşturacağız)
+            send_email_notification(
+                recipient_email=email,
+                subject="Şifre Sıfırlama İsteği",
+                template_name="password_reset_mail",
+                reset_url=reset_url,
+                user_name=getattr(user, 'isletme_adi', getattr(user, 'ad_soyad', user.kullanici_adi))
+            )
+            flash("Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.", "success")
+            return redirect(url_for('bp_common.index'))
+        else:
+            flash("Bu e-posta adresiyle kayıtlı bir kullanıcı bulunamadı.", "error")
+
+    return render_template('forgot_password.html')
+
+@bp_common.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    data = verify_reset_token(token)
+    if not data:
+        flash("Sıfırlama bağlantısı geçersiz veya süresi dolmuş.", "error")
+        return redirect(url_for('bp_common.forgot_password'))
+
+    if request.method == 'POST':
+        new_password = request.form.get('password')
+        
+        # --- GÜÇLÜ ŞİFRE KONTROLÜ (YENİ) ---
+        # 1. Uzunluk kontrolü
+        if len(new_password) < 8:
+            flash("Şifre en az 8 karakter uzunluğunda olmalıdır.", "error")
+            return render_template('reset_password_form.html', token=token)
+        
+        # 2. Karmaşıklık kontrolü (Büyük harf, küçük harf ve rakam)
+        if not re.search(r"[a-z]", new_password) or \
+           not re.search(r"[A-Z]", new_password) or \
+           not re.search(r"[0-9]", new_password):
+            flash("Şifreniz en az bir büyük harf, bir küçük harf ve bir rakam içermelidir.", "error")
+            return render_template('reset_password_form.html', token=token)
+        # ----------------------------------
+
+        email = data['email']
+        user_type = data['user_type']
+
+        user = None
+        if user_type == 'admin':
+            user = AdminKullanicilar.query.filter_by(email=email).first()
+        elif user_type == 'isletme':
+            user = Isletmeler.query.filter_by(isletme_email=email).first()
+        elif user_type == 'kurye':
+            user = Kuryeler.query.filter_by(email=email).first()
+
+        if user:
+            user.set_password(new_password)
+            db.session.commit()
+            flash("Şifreniz başarıyla güncellendi. Yeni şifrenizle giriş yapabilirsiniz.", "success")
+            return redirect(url_for('bp_common.index'))
+        else:
+            flash("Kullanıcı bulunamadı.", "error")
+            return redirect(url_for('bp_common.forgot_password'))
+
+    return render_template('reset_password_form.html', token=token)
+
 # --- YENİ EKLENEN CARİ HESAP EKSTRESİ PDF ROUTE'U ---
 @bp_common.route('/business_statement_pdf/<int:isletme_id>')
 def generate_business_statement_pdf(isletme_id):
@@ -467,6 +550,8 @@ def generate_business_statement_pdf(isletme_id):
         filename = f"{isletme.isletme_kodu}_Cari_Ekstre_{datetime.now().strftime('%d_%m_%Y')}.pdf"
         response.headers['Content-Disposition'] = f'inline; filename={filename}'
         return response
+    
+
 
     except Exception as e:
         current_app.logger.error(f"Cari Ekstre PDF (İşletme ID: {isletme_id}) oluşturulurken hata: {str(e)}", exc_info=True)

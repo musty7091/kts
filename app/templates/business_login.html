@@ -28,6 +28,9 @@
             <input type="password" id="sifre" name="sifre" class="form-control" required>
         </div>
         <button type="submit" class="btn btn-success btn-block mt-4">Giriş Yap</button>
+        <div class="text-center mt-3">
+            <a href="{{ url_for('bp_common.forgot_password') }}" class="text-danger">Şifremi Unuttum</a>
+        </div>
     </form>
     <div class="text-center mt-3">
         <a href="{{ url_for('bp_admin.login') }}">Yönetici Girişi</a>

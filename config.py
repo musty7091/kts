@@ -2,6 +2,10 @@
 import os
 import secrets
 from datetime import timedelta
+from dotenv import load_dotenv  # .env dosyasındaki verileri okumak için eklendi
+
+# .env dosyasındaki değişkenleri sisteme (os.environ) yükler
+load_dotenv() 
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -38,10 +42,8 @@ class Config:
     TESTING = _env_bool("TESTING", False)
 
     # ------------------------
-    # SECRET_KEY (P0 - kritik) - GÜNCELLENDİ
+    # SECRET_KEY (P0 - kritik)
     # ------------------------
-    # Raporun P0 uyarısı doğrultusunda: 
-    # Prod ortamında isek 'SECRET_KEY' mutlaka dışarıdan (env) gelmeli.
     _is_prod_like = not (TESTING or DEBUG or FLASK_ENV in ("development", "dev", "testing"))
     _secret_from_env = os.environ.get("SECRET_KEY")
 
@@ -49,17 +51,15 @@ class Config:
         SECRET_KEY = _secret_from_env
     else:
         if _is_prod_like:
-            # Üretim ortamında (Production) anahtar yoksa UYGULAMAYI DURDUR (En güvenli yöntem)
             raise RuntimeError(
                 "KRİTİK GÜVENLİK RİSKİ: SECRET_KEY ortam değişkeni PRODUCTION ortamında zorunludur! "
                 "Lütfen sunucu ayarlarından SECRET_KEY tanımlayın."
             )
         else:
-            # Sadece geliştirme/test ortamında ise kolaylık için geçici anahtar ata
             SECRET_KEY = "beecargo_yerel_gelistirme_anahtari_2026_xyz"
 
     # ------------------------
-    # DB
+    # DB (DATABASE_URL boşsa otomatik SQLite kullanılır)
     # ------------------------
     _db_url = _normalize_db_url(_env_str("DATABASE_URL", ""))
     if _db_url:
@@ -69,7 +69,6 @@ class Config:
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # Kopan bağlantılarda daha az hata (özellikle Postgres)
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True
     }
@@ -79,32 +78,26 @@ class Config:
     # ------------------------
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = _env_str("SESSION_COOKIE_SAMESITE", "Lax")
-
-    # Env ile override edilebilir; verilmezse prod-like ortamda True
     SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", _is_prod_like)
 
-    # Session süresi (dakika). Varsayılan 8 saat.
     _session_minutes = int(_env_str("SESSION_LIFETIME_MINUTES", "480"))
     PERMANENT_SESSION_LIFETIME = timedelta(minutes=_session_minutes)
 
-    # URL üretiminde prod'da https tercih edilsin (özellikle linkler / redirectler)
     PREFERRED_URL_SCHEME = _env_str("PREFERRED_URL_SCHEME", "https" if _is_prod_like else "http")
 
     # ------------------------
     # CSRF
     # ------------------------
-    # Token'ı sonsuza kadar geçerli bırakmayalım (P0 hygiene)
-    WTF_CSRF_TIME_LIMIT = int(_env_str("WTF_CSRF_TIME_LIMIT", "3600"))  # saniye (1 saat)
+    WTF_CSRF_TIME_LIMIT = int(_env_str("WTF_CSRF_TIME_LIMIT", "3600"))
 
     # ------------------------
-    # E-posta Ayarları
+    # E-posta Ayarları (Bilgileri .env dosyasından okur)
     # ------------------------
     MAIL_SERVER = _env_str("MAIL_SERVER", "smtp.gmail.com")
     MAIL_PORT = int(_env_str("MAIL_PORT", "587"))
     MAIL_USE_TLS = _env_bool("MAIL_USE_TLS", True)
     MAIL_USE_SSL = _env_bool("MAIL_USE_SSL", False)
 
-    # Sadece .env / environment üzerinden gelsin
     MAIL_USERNAME = _env_str("MAIL_USERNAME", "")
     MAIL_PASSWORD = _env_str("MAIL_PASSWORD", "")
 
@@ -114,5 +107,4 @@ class Config:
 
     SITE_NAME = _env_str("SITE_NAME", "BeeCargo")
     
-    # Dosya Yükleme Yolu
     UPLOAD_FOLDER = os.path.join(basedir, 'app', 'static', 'uploads')
