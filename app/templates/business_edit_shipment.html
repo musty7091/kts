@@ -58,7 +58,7 @@
                             <select id="alici_sehir_edit" name="alici_sehir" class="form-control form-control-sm" {% if not adres_ozelnot_duzenlenebilir %}disabled{% else %}required{% endif %}>
                                 <option value="" {% if not form_data.get('alici_sehir', kargo.alici_sehir) %}selected{% endif %} disabled>İlçe Seçiniz...</option>
                                 {% for ilce_adi in kktc_ilceler %}
-                                <option value="{{ ilce_adi }}" {% if form_data.get('alici_sehir', kargo.alici_sehir)= =ilce_adi %}selected{% endif %}>{{ ilce_adi }}</option>
+                                <option value="{{ ilce_adi }}" {% if form_data.get('alici_sehir', kargo.alici_sehir)==ilce_adi %}selected{% endif %}>{{ ilce_adi }}</option>
                                 {% endfor %}
                             </select>
                             {% if not adres_ozelnot_duzenlenebilir %}<input type="hidden" name="alici_sehir" value="{{ kargo.alici_sehir }}">{% endif %}

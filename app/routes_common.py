@@ -5,10 +5,10 @@ from flask import (
 )
 from .models import (
     Kargolar, Isletmeler, IsletmeOdemeleri, 
-    OdemeKargoIliskileri, Bildirimler, KargoDurumEnum, AdminKullanicilar # AdminKullanicilar eklendi (bildirim için)
+    OdemeKargoIliskileri, Bildirimler, KargoDurumEnum, AdminKullanicilar 
 )
 from . import db
-from .utils import normalize_to_e164_tr, create_notification # create_notification eklendi (kullanılacaksa)
+from .utils import normalize_to_e164_tr, create_notification 
 from weasyprint import HTML, CSS
 from decimal import Decimal
 import io
@@ -116,7 +116,6 @@ def mark_notification_read(notification_id):
         current_app.logger.error(f"Bildirim (ID: {notification_id}) okundu olarak işaretlenirken hata: {e}", exc_info=True)
         return jsonify(success=False, message="Bildirim işaretlenirken bir sunucu hatası oluştu."), 500
 
-# YENİ: Tümünü Okundu Olarak İşaretle
 @bp_common.route('/notifications/mark_all_read', methods=['POST'])
 def mark_all_notifications_read():
     user_id = None
@@ -133,7 +132,7 @@ def mark_all_notifications_read():
     else:
         return jsonify(success=False, message="Yetkisiz erişim."), 403
 
-    if not user_id: # Ekstra kontrol
+    if not user_id: 
         return jsonify(success=False, message="Kullanıcı bulunamadı."), 400
         
     try:
@@ -145,7 +144,6 @@ def mark_all_notifications_read():
         current_app.logger.error(f"Tüm bildirimler okundu olarak işaretlenirken hata (Kullanıcı ID: {user_id}): {e}", exc_info=True)
         return jsonify(success=False, message="Bildirimler işaretlenirken bir sunucu hatası oluştu."), 500
 
-# YENİ: Tümünü Sil (veya Sadece Okunanları Sil)
 @bp_common.route('/notifications/delete_all', methods=['POST'])
 def delete_all_notifications():
     user_id = None
@@ -166,9 +164,6 @@ def delete_all_notifications():
         return jsonify(success=False, message="Kullanıcı bulunamadı."), 400
 
     try:
-        # İsteğe bağlı: Sadece okunanları silmek için:
-        # deleted_count = Bildirimler.query.filter(user_filter, Bildirimler.okundu_mu == True).delete()
-        # Veya tümünü silmek için:
         deleted_count = Bildirimler.query.filter(user_filter).delete()
         db.session.commit()
         return jsonify(success=True, message=f"{deleted_count} bildirim silindi.")
@@ -177,10 +172,8 @@ def delete_all_notifications():
         current_app.logger.error(f"Tüm bildirimler silinirken hata (Kullanıcı ID: {user_id}): {e}", exc_info=True)
         return jsonify(success=False, message="Bildirimler silinirken bir sunucu hatası oluştu."), 500
 
-
 @bp_common.route('/notifications/unread_count')
 def unread_notification_count_api():
-    # ... (Bu fonksiyon aynı kalır) ...
     count = 0
     user_id = None
     query_filter = None
@@ -205,7 +198,6 @@ def unread_notification_count_api():
     
     return jsonify(unread_count=count)
 
-# ... (track_shipment_public_input ve diğer fonksiyonlar önceki gibi kalır) ...
 @bp_common.route('/track-shipment', methods=['GET', 'POST'])
 def track_shipment_public_input():
     kargo = None
@@ -384,3 +376,101 @@ def generate_payment_statement_pdf(odeme_id):
         if odeme_obj and hasattr(odeme_obj, 'isletme_id'): 
              return redirect(url_for('bp_admin.business_payment_history', isletme_id=odeme_obj.isletme_id))
         return redirect(url_for('bp_admin.isletme_bakiyeleri'))
+
+# --- YENİ EKLENEN CARİ HESAP EKSTRESİ PDF ROUTE'U ---
+@bp_common.route('/business_statement_pdf/<int:isletme_id>')
+def generate_business_statement_pdf(isletme_id):
+    # Bu raporu hem Admin hem de o işletmenin kendisi indirebilsin
+    if 'admin_id' not in session and 'isletme_id' not in session:
+        flash("Bu işlemi yapmak için giriş yapmalısınız.", "error")
+        return redirect(url_for('bp_common.index'))
+
+    # Eğer bir işletme girdiyse, sadece KENDİ hesabını indirebilir, başkasınınkini indiremez
+    if 'isletme_id' in session and session['isletme_id'] != isletme_id:
+        flash("Sadece kendi hesap ekstrenizi indirebilirsiniz.", "error")
+        return redirect(url_for('bp_business.dashboard'))
+
+    try:
+        isletme = Isletmeler.query.get_or_404(isletme_id)
+
+        # İstenirse tarih aralığı filtrelemesi
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+
+        kargolar_query = Kargolar.query.filter(Kargolar.isletme_id == isletme_id, Kargolar.kargo_durumu == KargoDurumEnum.TESLIM_EDILDI)
+        odemeler_query = IsletmeOdemeleri.query.filter_by(isletme_id=isletme_id)
+
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            kargolar_query = kargolar_query.filter(Kargolar.teslim_tarihi >= datetime.combine(start_date, datetime.min.time()))
+            odemeler_query = odemeler_query.filter(IsletmeOdemeleri.odeme_tarihi >= start_date)
+        if end_date_str:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            kargolar_query = kargolar_query.filter(Kargolar.teslim_tarihi <= datetime.combine(end_date, datetime.max.time()))
+            odemeler_query = odemeler_query.filter(IsletmeOdemeleri.odeme_tarihi <= end_date)
+
+        kargolar = kargolar_query.all()
+        odemeler = odemeler_query.all()
+
+        hareketler = []
+        
+        # 1. Kargo Teslimatlarını (İşletmenin kazancı ve hizmet borcu) listeye ekle
+        for k in kargolar:
+            hareketler.append({
+                'tarih': k.teslim_tarihi or k.olusturulma_tarihi,
+                'islem': f'Kargo Teslimatı (Takip No: {k.takip_numarasi})',
+                'alacak': k.isletmeye_aktarilacak_tutar,
+                'borc': k.kargo_ucreti_isletme_borcu,
+            })
+            
+        # 2. Ödemeleri (Senin işletmeye yaptığın nakit/havale çıkışı) listeye ekle
+        for o in odemeler:
+            hareketler.append({
+                'tarih': datetime.combine(o.odeme_tarihi, datetime.min.time()),
+                'islem': f'Firmamızdan Ödeme/Mahsup İşlemi (Ref: {o.islem_referansi or o.id})',
+                'alacak': Decimal('0.00'),
+                'borc': o.odenen_tutar, # Bu tutar işletmenin içerideki bakiyesini düşürür
+            })
+
+        # İşlemleri tarihe göre eskiden yeniye sırala
+        hareketler.sort(key=lambda x: x['tarih'])
+
+        # Kümülatif bakiyeyi (satır satır) hesapla
+        bakiye = Decimal('0.00')
+        toplam_alacak = Decimal('0.00')
+        toplam_borc = Decimal('0.00')
+
+        for h in hareketler:
+            toplam_alacak += h['alacak']
+            toplam_borc += h['borc']
+            bakiye += (h['alacak'] - h['borc'])
+            h['bakiye'] = bakiye
+
+        # Logo resminin linkini şablona göndermek için hazırla
+        logo_url = url_for('static', filename='images/bee.png', _external=True)
+
+        html_out = render_template(
+            'business_statement_pdf.html',
+            isletme=isletme,
+            hareketler=hareketler,
+            toplam_alacak=toplam_alacak,
+            toplam_borc=toplam_borc,
+            son_bakiye=bakiye,
+            now=datetime.now(),
+            start_date=start_date_str,
+            end_date=end_date_str,
+            logo_url=logo_url
+        )
+
+        pdf_bytes = HTML(string=html_out).write_pdf()
+        response = Response(pdf_bytes, mimetype='application/pdf')
+        filename = f"{isletme.isletme_kodu}_Cari_Ekstre_{datetime.now().strftime('%d_%m_%Y')}.pdf"
+        response.headers['Content-Disposition'] = f'inline; filename={filename}'
+        return response
+
+    except Exception as e:
+        current_app.logger.error(f"Cari Ekstre PDF (İşletme ID: {isletme_id}) oluşturulurken hata: {str(e)}", exc_info=True)
+        flash(f"Ekstre oluşturulurken bir hata oluştu.", "error")
+        if 'admin_id' in session:
+            return redirect(url_for('bp_admin.isletme_bakiyeleri'))
+        return redirect(url_for('bp_business.dashboard'))

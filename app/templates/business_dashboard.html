@@ -8,32 +8,79 @@
 <div class="jumbotron jumbotron-fluid text-white rounded mt-md-0 mt-lg-0 pt-lg-4 pb-lg-4 pt-md-4 pb-md-4 pt-3 pb-3 mb-4" style="background-color: #17a2b8;">
     <div class="container">
         <h1 class="display-5">Hoşgeldiniz, {{ session.get('isletme_adi', 'İşletme Yetkilisi') }}!</h1>
-        <p class="lead">Kargolarınızı ve ödemelerinizi buradan yönetebilirsiniz.</p>
+        <p class="lead">Kargolarınızı ve finansal durumunuzu buradan yönetebilirsiniz.</p>
     </div>
 </div>
 
 <div class="row mb-4">
-    <div class="col-md-6 mb-3 mb-md-0">
-        <div class="card shadow-sm h-100">
-            <div class="card-body">
-                <h2 class="card-title h4">Hesap Özeti</h2>
-                <p class="card-text">
-                    <strong>Güncel Toplam Alacağınız:</strong>
-                    <span class="badge badge-success" style="font-size: 1.1em;">{{ "%.2f"|format(toplam_alacak if toplam_alacak is not none else 0) }} TL</span>
-                </p>
-                <a href="{{ url_for('bp_business.payments') }}" class="btn btn-info btn-sm">
-                    <i class="fas fa-history mr-1"></i> Tüm Ödeme Geçmişi
-                </a>
+    <div class="col-md-3 mb-3">
+        <div class="card shadow-sm h-100 border-left-info">
+            <div class="card-body text-center">
+                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                    Kargo Performansınız
+                </div>
+                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                    {{ toplam_kargo_sayisi }} <small class="text-muted">Toplam</small><br>
+                    <span class="text-success">{{ teslim_edilen_kargo_sayisi }} <small class="text-muted">Teslim Edildi</small></span>
+                </div>
+                <div class="mt-2">
+                    <a href="{{ url_for('bp_business.add_shipment') }}" class="btn btn-sm btn-primary mt-1 w-100">
+                        <i class="fas fa-plus-circle"></i> Yeni Kargo
+                    </a>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-6">
-        <div class="card shadow-sm h-100">
-            <div class="card-body text-center">
-                <h2 class="card-title h4 mb-3">Hızlı İşlem</h2>
-                <a href="{{ url_for('bp_business.add_shipment') }}" class="btn btn-lg btn-primary">
-                    <i class="fas fa-plus-circle mr-2"></i>Yeni Kargo Ekle
-                </a>
+
+    <div class="col-md-3 mb-3">
+        <div class="card shadow-sm h-100 border-left-success">
+            <div class="card-body text-center" title="Teslim edilmiş kapıda ödemeli kargolarınızdan size aktarılacak olan tutar.">
+                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                    Tahsilat Alacağınız
+                </div>
+                <div class="h3 mb-0 font-weight-bold text-success">
+                    <i class="fas fa-hand-holding-usd"></i> {{ "%.2f"|format(bekleyen_tahsilat if bekleyen_tahsilat is not none else 0) }} TL
+                </div>
+                <p class="text-muted small mt-2 mb-0">Kapıda ödeme (nakit) ile teslim edilen ürün bedelleriniz.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+        <div class="card shadow-sm h-100 border-left-danger">
+            <div class="card-body text-center" title="Teslim edilmiş kargolarınız için kargo firmasına olan hizmet bedeli borcunuz.">
+                <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                    Hizmet Bedeli Borcunuz
+                </div>
+                <div class="h3 mb-0 font-weight-bold text-danger">
+                    <i class="fas fa-file-invoice-dollar"></i> {{ "%.2f"|format(bekleyen_hizmet_bedeli if bekleyen_hizmet_bedeli is not none else 0) }} TL
+                </div>
+                <p class="text-muted small mt-2 mb-0">Teslim edilen kargolarınızın kargo gönderim ücretleri.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-3">
+        <div class="card shadow-sm h-100 border-left-warning" style="background-color: #f8f9fc;">
+            <div class="card-body text-center" title="Alacağınızdan borcunuz düşüldükten sonra kalan net bakiyeniz.">
+                <div class="text-xs font-weight-bold text-uppercase mb-1 text-dark">
+                    GÜNCEL NET BAKİYE
+                </div>
+                <div class="h3 mb-0 font-weight-bold {% if guncel_net_bakiye >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ "%.2f"|format(guncel_net_bakiye if guncel_net_bakiye is not none else 0) }} TL
+                </div>
+                <p class="text-muted small mt-2 mb-0">
+                    {% if guncel_net_bakiye >= 0 %}
+                    <i class="fas fa-arrow-up text-success"></i> Alacaklısınız
+                    {% else %}
+                    <i class="fas fa-arrow-down text-danger"></i> Borçlusunuz
+                    {% endif %}
+                </p>
+                <div class="mt-2">
+                    <a href="{{ url_for('bp_business.payments') }}" class="btn btn-sm btn-outline-info w-100">
+                        <i class="fas fa-history"></i> Ödeme Geçmişi
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -67,7 +114,6 @@
                         <select id="kargo_durumu_biz" name="kargo_durumu" class="form-control form-control-sm">
                             <option value="" {% if not request.args.get('kargo_durumu') %}selected{% endif %}>Tümü</option>
                             {# KargoDurumEnum Python tarafından bu şablona gönderilmeli #}
-                            {# routes_business.py -> dashboard fonksiyonunda KargoDurumEnum şablona gönderiliyor #}
                             {% for durum in KargoDurumEnum %}
                             <option value="{{ durum.value }}" {% if request.args.get('kargo_durumu')==durum.value %}selected{% endif %}>{{ durum.value }}</option>
                             {% endfor %}
@@ -142,7 +188,6 @@
                         <td>{{ kargo.alici_adi_soyadi }}</td>
                         <td>{{ kargo.alici_sehir }}</td>
                         <td>{{ kargo.alici_telefon }}</td>
-                        {# Kargo durumunu .value ile göster ve Enum ile karşılaştır #}
                         <td><span class="badge {% if kargo.kargo_durumu == KargoDurumEnum.TESLIM_EDILDI %}badge-success{% elif kargo.kargo_durumu == KargoDurumEnum.HAZIRLANIYOR or kargo.kargo_durumu == KargoDurumEnum.PAKETLENDI %}badge-warning{% elif kargo.kargo_durumu.name.startswith('IPTAL') or kargo.kargo_durumu.name.startswith('IADE') %}badge-danger{% else %}badge-info{% endif %}">{{ kargo.kargo_durumu.value }}</span></td>
                         <td>{{ kargo.olusturulma_tarihi.strftime('%d-%m-%y %H:%M') }}</td>
                         <td>
@@ -157,7 +202,6 @@
                                 <i class="fas fa-search"></i>
                             </a>
                             {% if not kargo.isletmeye_aktarildi_mi %}
-                            {# Admin tarafından işleme alınmış durumlar (Enum üyeleri) #}
                             {% set admin_processed_statuses = [
                             KargoDurumEnum.KARGO_ALINDI_MERKEZDE, KargoDurumEnum.DAGITIMDA,
                             KargoDurumEnum.TESLIM_EDILDI, KargoDurumEnum.TESLIM_EDILEMEDI_ALICI_ULASILAMADI,
@@ -165,7 +209,6 @@
                             KargoDurumEnum.IADE_EDILDI_ISLETMEYE, KargoDurumEnum.IPTAL_EDILDI_ADMIN
                             ] %}
                             {% if kargo.kargo_durumu not in admin_processed_statuses %}
-                            {# İşletmenin düzenleyebileceği durumlar (Enum üyeleri) #}
                             {% set isletme_editable_statuses = [
                             KargoDurumEnum.HAZIRLANIYOR,
                             KargoDurumEnum.PAKETLENDI,
@@ -258,15 +301,18 @@
         margin-bottom: .2rem;
     }
 
-    .card-body .badge-success { /* Hesap özeti için */
-        font-size: 1em;
-        padding: .5em .75em;
+    /* Sol kenar çizgili kart tasarımları */
+    .border-left-info {
+        border-left: 0.25rem solid #36b9cc !important;
+    }
+    .border-left-success {
+        border-left: 0.25rem solid #1cc88a !important;
+    }
+    .border-left-danger {
+        border-left: 0.25rem solid #e74a3b !important;
+    }
+    .border-left-warning {
+        border-left: 0.25rem solid #f6c23e !important;
     }
 </style>
-{% endblock %}
-
-{% block scripts_extra %}
-{# Bildirim script'i base.html'e taşındığı için buradan kaldırılabilir veya özel kalabilir #}
-{# Şimdilik base.html'deki genel script'in yeterli olduğunu varsayıyorum. #}
-{# Eğer bu sayfaya özel bir JS gerekirse buraya eklenebilir. #}
 {% endblock %}

@@ -6,9 +6,14 @@
 <div class="container mt-4 mb-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="mb-0">Ödeme Geçmişim</h2>
-        <a href="{{ url_for('bp_business.dashboard') }}" class="btn btn-outline-secondary btn-sm">
-            <i class="fas fa-tachometer-alt mr-1"></i> İşletme Paneline Geri Dön
-        </a>
+        <div>
+            <a href="{{ url_for('bp_common.generate_business_statement_pdf', isletme_id=session.get('isletme_id')) }}" class="btn btn-danger btn-sm mr-2" target="_blank">
+                <i class="fas fa-file-pdf mr-1"></i> Cari Ekstre İndir
+            </a>
+            <a href="{{ url_for('bp_business.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-tachometer-alt mr-1"></i> İşletme Paneline Geri Dön
+            </a>
+        </div>
     </div>
 
     <div class="card shadow-sm">

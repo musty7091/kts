@@ -140,7 +140,12 @@
 {% block scripts_extra %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Tekil bildirim okundu işaretleme (base.html'den gelenle çakışmaması için kontrol edilebilir veya sadece burada olabilir)
+    
+    // Güvenlik biletini (CSRF Token) sayfadan alıyoruz
+    const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+    const csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : '';
+
+    // Tekil bildirim okundu işaretleme
     const notificationLinks = document.querySelectorAll('#notificationListContainer a.message.stretched-link');
     notificationLinks.forEach(link => {
         link.addEventListener('click', function(event) {
@@ -153,7 +158,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 event.preventDefault();
                 fetch(`{{ url_for('bp_common.mark_notification_read', notification_id=0) }}`.replace('0', notificationId), {
                     method: 'POST',
-                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+                    headers: { 
+                        'Accept': 'application/json', 
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken // Güvenlik bileti eklendi
+                    }
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -184,7 +193,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
             fetch("{{ url_for('bp_common.mark_all_notifications_read') }}", {
                 method: 'POST',
-                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+                headers: { 
+                    'Accept': 'application/json', 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken // Güvenlik bileti eklendi
+                }
             })
             .then(response => response.json())
             .then(data => {
@@ -210,7 +223,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
             fetch("{{ url_for('bp_common.delete_all_notifications') }}", {
                 method: 'POST',
-                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }
+                headers: { 
+                    'Accept': 'application/json', 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken // Güvenlik bileti eklendi
+                }
             })
             .then(response => response.json())
             .then(data => {

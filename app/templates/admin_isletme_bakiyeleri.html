@@ -2,8 +2,6 @@
 
 {% block title %}İşletme Bakiyeleri - Admin Paneli{% endblock %}
 
-
-
 {% block content %}
 <div class="container mt-4 mb-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -60,8 +58,11 @@
                                 <a href="{{ url_for('bp_admin.record_payment', isletme_id=veri.isletme.id) }}" class="btn btn-sm btn-primary mr-1" title="Ödeme/Mahsup Kaydet">
                                     <i class="fas fa-hand-holding-usd"></i> Ödeme/Mahsup
                                 </a>
-                                <a href="{{ url_for('bp_admin.business_payment_history', isletme_id=veri.isletme.id) }}" class="btn btn-sm btn-outline-secondary" title="Ödeme Geçmişi">
+                                <a href="{{ url_for('bp_admin.business_payment_history', isletme_id=veri.isletme.id) }}" class="btn btn-sm btn-outline-secondary mr-1" title="Ödeme Geçmişi">
                                     <i class="fas fa-history"></i> Geçmiş
+                                </a>
+                                <a href="{{ url_for('bp_common.generate_business_statement_pdf', isletme_id=veri.isletme.id) }}" class="btn btn-sm btn-outline-danger" title="Cari Hesap Ekstresi (PDF) İndir" target="_blank">
+                                    <i class="fas fa-file-pdf"></i> Ekstre
                                 </a>
                             </td>
                         </tr>
@@ -86,7 +87,6 @@
 {% block head_extra %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
 <style>
-    /* ... (mevcut diğer stil tanımlamalarınız kalabilir) ... */
     .card-header .form-inline .form-control {
         width: auto;
     }
@@ -94,17 +94,17 @@
     .table thead th {
         background-color: #e9ecef;
         font-weight: 600;
-        font-size: 0.85rem; /* Boyutları diğerleriyle tutarlı hale getirelim */
+        font-size: 0.85rem; 
     }
 
     .table td {
-        font-size: 0.8rem; /* Boyutları diğerleriyle tutarlı hale getirelim */
+        font-size: 0.8rem; 
         vertical-align: middle;
     }
 
         .table td .btn-sm {
-            padding: 0.2rem 0.4rem; /* Buton iç boşluğu */
-            font-size: 0.75rem; /* Buton yazı boyutu */
+            padding: 0.2rem 0.4rem; 
+            font-size: 0.75rem; 
         }
 
     .badge {
@@ -112,7 +112,7 @@
         padding: .3em .5em;
     }
 
-    .card-header h3.h5 { /* card-header içindeki h3.h5 için */
+    .card-header h3.h5 { 
         font-size: 1.15rem;
         font-weight: 500;
     }

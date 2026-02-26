@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Cari Hesap Ekstresi - {{ isletme.isletme_kodu }}</title>
+    <style>
+        /* PDF Kağıt Ayarları */
+        @page {
+            size: A4;
+            margin: 20mm 15mm;
+            @bottom-right {
+                content: "Sayfa " counter(page) " / " counter(pages);
+                font-size: 10px;
+                color: #7f8c8d;
+            }
+            @bottom-left {
+                content: "Belge Oluşturulma: {{ now.strftime('%d.%m.%Y %H:%M') }}";
+                font-size: 10px;
+                color: #7f8c8d;
+            }
+        }
+        
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #333;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        /* Üst Başlık ve Logo Alanı */
+        .header-table {
+            width: 100%;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #2c3e50;
+            padding-bottom: 10px;
+        }
+        .header-table td {
+            vertical-align: middle;
+        }
+        .logo-img {
+            max-height: 60px;
+        }
+        .company-info {
+            text-align: right;
+            color: #2c3e50;
+        }
+        .company-info h1 {
+            margin: 0;
+            font-size: 24px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        
+        /* Belge Başlığı */
+        .document-title {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #34495e;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        /* İşletme Bilgi Kutusu */
+        .info-table {
+            width: 100%;
+            margin-bottom: 25px;
+        }
+        .info-table td {
+            vertical-align: top;
+            width: 50%;
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 12px;
+            border-radius: 4px;
+        }
+        .info-box strong {
+            color: #2c3e50;
+        }
+
+        /* Hareket Tablosu */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        .data-table th {
+            background-color: #2c3e50;
+            color: #ffffff;
+            padding: 10px 8px;
+            text-align: left;
+            font-size: 11px;
+            border: 1px solid #2c3e50;
+        }
+        .data-table td {
+            padding: 8px;
+            border: 1px solid #bdc3c7;
+            font-size: 11px;
+        }
+        .data-table tr:nth-child(even) {
+            background-color: #fbfbfc;
+        }
+        
+        /* Hizalamalar ve Renkler */
+        .text-right { text-align: right !important; }
+        .text-center { text-align: center !important; }
+        .text-success { color: #27ae60; font-weight: bold; }
+        .text-danger { color: #c0392b; font-weight: bold; }
+        .text-info { color: #2980b9; font-weight: bold; }
+
+        /* Alt Özet Tablosu */
+        .summary-container {
+            width: 100%;
+        }
+        .summary-table {
+            width: 45%;
+            float: right;
+            border-collapse: collapse;
+        }
+        .summary-table th {
+            background-color: #ecf0f1;
+            color: #2c3e50;
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #bdc3c7;
+            font-size: 12px;
+        }
+        .summary-table td {
+            padding: 8px;
+            text-align: right;
+            border: 1px solid #bdc3c7;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        .total-row {
+            background-color: #e8f4f8;
+        }
+        .clear {
+            clear: both;
+        }
+    </style>
+</head>
+<body>
+
+    <table class="header-table">
+        <tr>
+            <td>
+                {% if logo_url %}
+                <img src="{{ logo_url }}" alt="Logo" class="logo-img">
+                {% else %}
+                <h2 style="margin:0; color:#2c3e50;">BeeCargo</h2>
+                {% endif %}
+            </td>
+            <td class="company-info">
+                <h1>HESAP EKSTRESİ</h1>
+                <p style="margin: 5px 0 0 0; color: #7f8c8d;">Resmi Finansal Döküm Raporu</p>
+            </td>
+        </tr>
+    </table>
+
+    <div class="document-title">Cari Hesap Hareketleri</div>
+
+    <table class="info-table">
+        <tr>
+            <td style="padding-right: 10px;">
+                <div class="info-box">
+                    <strong>Müşteri Bilgileri:</strong><br>
+                    İşletme Adı: {{ isletme.isletme_adi }}<br>
+                    İşletme Kodu: {{ isletme.isletme_kodu }}<br>
+                    Yetkili: {{ isletme.yetkili_kisi or '-' }}<br>
+                    Telefon: {{ isletme.isletme_telefon }}
+                </div>
+            </td>
+            <td style="padding-left: 10px;">
+                <div class="info-box">
+                    <strong>Rapor Detayı:</strong><br>
+                    Tarih Aralığı: 
+                    {% if start_date and end_date %}
+                        {{ start_date }} / {{ end_date }}
+                    {% else %}
+                        Tüm Zamanlar
+                    {% endif %}
+                    <br>
+                    Para Birimi: Türk Lirası (TL)
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th width="15%">Tarih</th>
+                <th width="40%">İşlem Açıklaması</th>
+                <th width="15%" class="text-right">Alacak (+)</th>
+                <th width="15%" class="text-right">Borç (-)</th>
+                <th width="15%" class="text-right">Bakiye</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if hareketler|length > 0 %}
+                {% for h in hareketler %}
+                <tr>
+                    <td>{{ h.tarih.strftime('%d.%m.%Y %H:%M') }}</td>
+                    <td>{{ h.islem }}</td>
+                    <td class="text-right text-success">{{ "%.2f"|format(h.alacak) }}</td>
+                    <td class="text-right text-danger">{{ "%.2f"|format(h.borc) }}</td>
+                    <td class="text-right text-info">{{ "%.2f"|format(h.bakiye) }}</td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="5" class="text-center" style="padding: 20px;">Bu tarih aralığında herhangi bir hesap hareketi bulunmamaktadır.</td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <div class="summary-container">
+        <table class="summary-table">
+            <tr>
+                <th>Toplam Alacak:</th>
+                <td class="text-success">{{ "%.2f"|format(toplam_alacak) }} TL</td>
+            </tr>
+            <tr>
+                <th>Toplam Borç (Kesinti):</th>
+                <td class="text-danger">{{ "%.2f"|format(toplam_borc) }} TL</td>
+            </tr>
+            <tr class="total-row">
+                <th style="font-size: 14px;">GÜNCEL NET BAKİYE:</th>
+                <td style="font-size: 14px;" class="{% if son_bakiye >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ "%.2f"|format(son_bakiye) }} TL
+                </td>
+            </tr>
+        </table>
+        <div class="clear"></div>
+    </div>
+
+</body>
+</html>

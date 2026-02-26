@@ -20,10 +20,6 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 bp_business = Blueprint('bp_business', __name__, template_folder='templates', url_prefix='/business')
 
-# --- Diğer route fonksiyonları burada yer alıyor (login, dashboard, add_shipment, edit_shipment vb.) ---
-# Bu fonksiyonlar önceki yanıtlarda verildiği gibi kalacak.
-# Sadece 'change_password' ve 'logout' fonksiyonları güncellenecek/kontrol edilecek.
-
 @bp_business.route('/login', methods=['GET', 'POST'])
 def login():
     if 'isletme_id' in session:
@@ -33,7 +29,6 @@ def login():
         sifre = request.form.get('sifre')
         isletme_obj = Isletmeler.query.filter_by(kullanici_adi=kullanici_adi).first()
         if isletme_obj and isletme_obj.aktif_mi and check_password_hash(isletme_obj.sifre_hash, sifre):
-            # P0: session fixation azaltma - girişte oturumu temizle ve yeni oturum başlat
             session.clear()
             session.permanent = True
 
@@ -101,31 +96,45 @@ def dashboard():
     try:
         isletmenin_kargolari = query.order_by(Kargolar.olusturulma_tarihi.desc()).all()
         isletme_verileri['kargolar'] = isletmenin_kargolari
+        
+        # Temel Kargo İstatistikleri
+        isletme_verileri['toplam_kargo_sayisi'] = Kargolar.query.filter_by(isletme_id=isletme_id_session).count()
+        isletme_verileri['teslim_edilen_kargo_sayisi'] = Kargolar.query.filter_by(isletme_id=isletme_id_session, kargo_durumu=KargoDurumEnum.TESLIM_EDILDI).count()
+
     except Exception as e:
         flash(f"Kargolar listelenirken bir hata oluştu: {str(e)}", "error")
         current_app.logger.error(f"İşletme dashboard kargo listeleme hatası: {e}", exc_info=True)
         isletme_verileri['kargolar'] = []
+        isletme_verileri['toplam_kargo_sayisi'] = 0
+        isletme_verileri['teslim_edilen_kargo_sayisi'] = 0
 
     try:
-        net_alacak_kapida_nakit = db.session.query(
-            func.sum(Kargolar.isletmeye_aktarilacak_tutar - Kargolar.kargo_ucreti_isletme_borcu)
+        # İŞLETME HESAP ÖZETİ HESAPLAMALARI (Sadece Teslim Edilmiş ve Mahsuplaşmamış olanlar)
+        
+        # 1. İşletmenin kargo firmasından alacağı (Kapıda nakit tahsil edilen ürün bedelleri)
+        bekleyen_tahsilat = db.session.query(
+            func.sum(Kargolar.isletmeye_aktarilacak_tutar)
         ).filter(
             Kargolar.isletme_id == isletme_id_session,
             Kargolar.isletmeye_aktarildi_mi == False,
-            Kargolar.kargo_durumu == KargoDurumEnum.TESLIM_EDILDI,
-            Kargolar.odeme_yontemi_teslimde == "Kapıda Nakit"
+            Kargolar.kargo_durumu == KargoDurumEnum.TESLIM_EDILDI
         ).scalar() or Decimal('0.00')
 
-        borc_diger_yontemler_hizmet_bedeli = db.session.query(
+        # 2. İşletmenin kargo firmasına olan hizmet bedeli borcu (Teslim edilen tüm kargoların ücreti)
+        bekleyen_hizmet_bedeli = db.session.query(
             func.sum(Kargolar.kargo_ucreti_isletme_borcu)
         ).filter(
             Kargolar.isletme_id == isletme_id_session,
             Kargolar.isletmeye_aktarildi_mi == False,
-            Kargolar.kargo_durumu == KargoDurumEnum.TESLIM_EDILDI,
-            Kargolar.odeme_yontemi_teslimde.in_(["Online / Havale", "Kapıda Kredi Kartı"])
+            Kargolar.kargo_durumu == KargoDurumEnum.TESLIM_EDILDI
         ).scalar() or Decimal('0.00')
 
-        isletme_verileri['toplam_alacak'] = net_alacak_kapida_nakit - borc_diger_yontemler_hizmet_bedeli
+        # 3. Güncel Net Bakiye (Alacak - Borç)
+        guncel_net_bakiye = bekleyen_tahsilat - bekleyen_hizmet_bedeli
+
+        isletme_verileri['bekleyen_tahsilat'] = bekleyen_tahsilat
+        isletme_verileri['bekleyen_hizmet_bedeli'] = bekleyen_hizmet_bedeli
+        isletme_verileri['guncel_net_bakiye'] = guncel_net_bakiye
 
         son_odemeler = IsletmeOdemeleri.query.filter_by(isletme_id=isletme_id_session).order_by(IsletmeOdemeleri.odeme_tarihi.desc()).limit(5).all()
         isletme_verileri['son_odemeler'] = son_odemeler
@@ -133,8 +142,10 @@ def dashboard():
     except Exception as e:
         flash(f"Panel finansal verileri getirilirken bir hata oluştu: {str(e)}", "error")
         current_app.logger.error(f"İşletme dashboard finansal veri hatası: {e}", exc_info=True)
-        if 'toplam_alacak' not in isletme_verileri: isletme_verileri['toplam_alacak'] = Decimal('0.00')
-        if 'son_odemeler' not in isletme_verileri: isletme_verileri['son_odemeler'] = []
+        isletme_verileri['bekleyen_tahsilat'] = Decimal('0.00')
+        isletme_verileri['bekleyen_hizmet_bedeli'] = Decimal('0.00')
+        isletme_verileri['guncel_net_bakiye'] = Decimal('0.00')
+        isletme_verileri['son_odemeler'] = []
 
     return render_template('business_dashboard.html', KargoDurumEnum=KargoDurumEnum, **isletme_verileri)
 
@@ -462,10 +473,10 @@ def change_password():
         return redirect(url_for('bp_business.login'))
 
     isletme = Isletmeler.query.get_or_404(session['isletme_id'])
-    form_data = {}  # Hata durumunda formu dolu tutmak için
+    form_data = {} 
 
     if request.method == 'POST':
-        form_data = request.form.to_dict()  # Form verilerini al
+        form_data = request.form.to_dict() 
         current_password = request.form.get('current_password')
         new_password = request.form.get('new_password')
         confirm_new_password = request.form.get('confirm_new_password')
@@ -476,7 +487,6 @@ def change_password():
             flash('Mevcut şifreniz yanlış.', 'error')
         elif new_password != confirm_new_password:
             flash('Yeni şifreler eşleşmiyor.', 'error')
-            # Sadece current_password'ı koru, yeni şifre alanlarını temizle
             form_data['new_password'] = ''
             form_data['confirm_new_password'] = ''
         else:
@@ -489,15 +499,12 @@ def change_password():
 
             if errors:
                 for error_msg in errors: flash(error_msg, 'error')
-                # Hatalı durumda current_password'ı koru, yeni şifre alanlarını temizle
                 form_data['new_password'] = ''
                 form_data['confirm_new_password'] = ''
             else:
                 try:
                     isletme.sifre_hash = generate_password_hash(new_password)
                     db.session.commit()
-                    # Şifre başarıyla değiştirildi, oturumu sonlandır ve giriş sayfasına yönlendir
-                    # P0: Şifre değişince tam oturum sıfırla
                     session.clear()
                     flash('Şifreniz başarıyla güncellendi! Güvenlik nedeniyle tekrar giriş yapmanız gerekmektedir.', 'success')
                     return redirect(url_for('bp_business.login'))
@@ -505,24 +512,17 @@ def change_password():
                     db.session.rollback()
                     flash(f'Şifre güncellenirken bir hata oluştu: {str(e)}', 'error')
                     current_app.logger.error(f"İşletme ({isletme.id}) şifre güncelleme hatası: {e}", exc_info=True)
-                    # Hata durumunda current_password'ı koru
-                    # form_data zaten request.form.to_dict() ile alınmıştı, o değerler kalır.
 
-        # Şifre formuyla ilgili bir işlem yapıldıysa (başarılı veya hatalı), sayfayı tekrar render et
         return render_template('business_change_password.html', isletme=isletme, form_data=form_data)
 
-    # GET request için
     return render_template('business_change_password.html', isletme=isletme, form_data=form_data)
 
 @bp_business.route('/logout')
 def logout():
-    # P0: çıkışta tüm oturumu temizle
     session.clear()
     flash('Başarıyla çıkış yaptınız.', 'success')
     return redirect(url_for('bp_common.index'))
 
-# Diğer route fonksiyonları (update_status, payments, payment_details, shipment_details)
-# önceki yanıtlarda verildiği gibi kalacak.
 @bp_business.route('/update_status/<int:kargo_id>', methods=['GET', 'POST'])
 def update_shipment_status(kargo_id):
     if 'isletme_id' not in session:
