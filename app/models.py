@@ -285,5 +285,21 @@ def create_audit_log(
         user_agent=(str(user_agent)[:255] if user_agent else None),
         details_json=details_json,
     )
+
     db.session.add(log)
     return log
+
+# app/models.py dosyasına bu sınıfı ekle (dosyanın sonuna ekleyebilirsin)
+
+class LoginAttempt(db.Model):
+    __tablename__ = 'login_attempts'
+    id = db.Column(db.Integer, primary_key=True)
+    ip = db.Column(db.String(45), nullable=False)
+    path = db.Column(db.String(100), nullable=False)
+    count = db.Column(db.Integer, default=0)
+    last_attempt_at = db.Column(db.DateTime, default=datetime.now)
+    blocked_until = db.Column(db.DateTime, nullable=True)
+
+    __table_args__ = (
+        db.Index("ix_login_attempt_ip_path", "ip", "path"),
+    )

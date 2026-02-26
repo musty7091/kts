@@ -2,13 +2,12 @@
 import os
 import secrets
 from datetime import timedelta
-from dotenv import load_dotenv  # .env dosyasındaki verileri okumak için eklendi
+from dotenv import load_dotenv  # .env dosyasındaki verileri okumak için
 
 # .env dosyasındaki değişkenleri sisteme (os.environ) yükler
 load_dotenv() 
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-
 
 def _env_bool(name: str, default: bool = False) -> bool:
     v = os.environ.get(name)
@@ -16,11 +15,9 @@ def _env_bool(name: str, default: bool = False) -> bool:
         return default
     return v.strip().lower() in ("1", "true", "yes", "on")
 
-
 def _env_str(name: str, default: str = "") -> str:
     v = os.environ.get(name)
     return default if v is None else str(v).strip()
-
 
 def _normalize_db_url(url: str) -> str:
     """
@@ -34,7 +31,6 @@ def _normalize_db_url(url: str) -> str:
         return "postgresql://" + u[len("postgres://") :]
     return u
 
-
 class Config:
     # Ortam bilgisi
     FLASK_ENV = _env_str("FLASK_ENV", "production").lower()
@@ -44,19 +40,20 @@ class Config:
     # ------------------------
     # SECRET_KEY (P0 - kritik)
     # ------------------------
+    # _is_prod_like'ı en üste alıyoruz ki sınıfın diğer bölümleri buna erişebilsin
     _is_prod_like = not (TESTING or DEBUG or FLASK_ENV in ("development", "dev", "testing"))
+    
     _secret_from_env = os.environ.get("SECRET_KEY")
 
     if _secret_from_env:
         SECRET_KEY = _secret_from_env
     else:
-        if _is_prod_like:
-            raise RuntimeError(
-                "KRİTİK GÜVENLİK RİSKİ: SECRET_KEY ortam değişkeni PRODUCTION ortamında zorunludur! "
-                "Lütfen sunucu ayarlarından SECRET_KEY tanımlayın."
-            )
-        else:
-            SECRET_KEY = "beecargo_yerel_gelistirme_anahtari_2026_xyz"
+        # GÜVENLİK İYİLEŞTİRMESİ: Hardcoded anahtarı tamamen kaldırdık.
+        # Artık .env dosyasında SECRET_KEY tanımlı değilse uygulama hata verir.
+        raise RuntimeError(
+            "KRİTİK GÜVENLİK HATASI: SECRET_KEY ortam değişkeni bulunamadı! "
+            "Lütfen .env dosyanıza bir SECRET_KEY tanımlayın."
+        )
 
     # ------------------------
     # DB (DATABASE_URL boşsa otomatik SQLite kullanılır)
@@ -91,7 +88,7 @@ class Config:
     WTF_CSRF_TIME_LIMIT = int(_env_str("WTF_CSRF_TIME_LIMIT", "3600"))
 
     # ------------------------
-    # E-posta Ayarları (Bilgileri .env dosyasından okur)
+    # E-posta Ayarları
     # ------------------------
     MAIL_SERVER = _env_str("MAIL_SERVER", "smtp.gmail.com")
     MAIL_PORT = int(_env_str("MAIL_PORT", "587"))

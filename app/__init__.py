@@ -9,7 +9,7 @@ from flask_mail import Mail  # Flask-Mail importu
 from config import Config
 from werkzeug.security import generate_password_hash, check_password_hash
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -59,14 +59,8 @@ def create_app(config_class=Config):
         )
 
     # -------------------------
-    # P0-1: Login brute-force koruması (in-memory throttle)
+    # P0-1: Login brute-force koruması (Database tabanlı)
     # -------------------------
-    LOGIN_THROTTLE_WINDOW = int(os.environ.get("LOGIN_THROTTLE_WINDOW_SECONDS", "600"))   # 10 dk
-    LOGIN_THROTTLE_MAX    = int(os.environ.get("LOGIN_THROTTLE_MAX_ATTEMPTS", "30"))     # 30 deneme
-    LOGIN_THROTTLE_BLOCK  = int(os.environ.get("LOGIN_THROTTLE_BLOCK_SECONDS", "900"))   # 15 dk
-
-    app.extensions.setdefault("kts_login_throttle", {})
-
     @app.before_request
     def _login_throttle_guard():
         if request.method != "POST":
@@ -77,33 +71,35 @@ def create_app(config_class=Config):
             return None
 
         ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip() or "unknown"
-        key = f"{ip}:{path}"
+        
+        from .models import LoginAttempt
+        attempt = LoginAttempt.query.filter_by(ip=ip, path=path).first()
+        now = datetime.now()
 
-        store = app.extensions.get("kts_login_throttle", {})
-        now = int(time.time())
+        if attempt and attempt.blocked_until and now > attempt.blocked_until:
+            db.session.delete(attempt)
+            db.session.commit()
+            attempt = None
 
-        rec = store.get(key) or {"first_ts": now, "count": 0, "blocked_until": 0}
-
-        if rec.get("blocked_until", 0) and now < int(rec["blocked_until"]):
+        if attempt and attempt.blocked_until and now < attempt.blocked_until:
             current_app.logger.warning(f"Login throttle BLOCK: ip={ip} path={path}")
             abort(429)
 
-        first_ts = int(rec.get("first_ts", now))
-        if now - first_ts > LOGIN_THROTTLE_WINDOW:
-            rec = {"first_ts": now, "count": 0, "blocked_until": 0}
+        if not attempt:
+            attempt = LoginAttempt(ip=ip, path=path, count=1, last_attempt_at=now)
+            db.session.add(attempt)
+        else:
+            attempt.count += 1
+            attempt.last_attempt_at = now
 
-        rec["count"] = int(rec.get("count", 0)) + 1
+        if attempt.count > 30:
+            attempt.blocked_until = datetime.now() + timedelta(minutes=15)
+            current_app.logger.warning(f"Login throttle TRIGGER: ip={ip} path={path} count={attempt.count}")
+        
+        db.session.commit()
 
-        if rec["count"] > LOGIN_THROTTLE_MAX:
-            rec["blocked_until"] = now + LOGIN_THROTTLE_BLOCK
-            store[key] = rec
-            current_app.logger.warning(
-                f"Login throttle TRIGGER: ip={ip} path={path} count={rec['count']} window={LOGIN_THROTTLE_WINDOW}s block={LOGIN_THROTTLE_BLOCK}s"
-            )
+        if attempt.blocked_until and now < attempt.blocked_until:
             abort(429)
-
-        store[key] = rec
-        return None
 
     @app.errorhandler(429)
     def _too_many_requests(e):
@@ -155,15 +151,12 @@ def create_app(config_class=Config):
     def _audit_state_changing_requests(response):
         try:
             path = request.path or ""
-
             # SADECE admin/business/courier alanlarını URL prefix ile yakala
             if not (path.startswith("/admin") or path.startswith("/business") or path.startswith("/courier")):
                 return response
-
             # Sadece state-changing istekleri logla
             if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
                 return response
-
             # Login POST'larını burada loglamıyoruz
             if path in ("/admin/login", "/business/login", "/courier/login"):
                 return response
@@ -172,27 +165,21 @@ def create_app(config_class=Config):
             actor_type = "system"
             actor_id = None
             if path.startswith("/admin") and "admin_id" in session:
-                actor_type = "admin"
-                actor_id = session.get("admin_id")
+                actor_type, actor_id = "admin", session.get("admin_id")
             elif path.startswith("/business") and "isletme_id" in session:
-                actor_type = "isletme"
-                actor_id = session.get("isletme_id")
+                actor_type, actor_id = "isletme", session.get("isletme_id")
             elif path.startswith("/courier") and "kurye_id" in session:
-                actor_type = "kurye"
-                actor_id = session.get("kurye_id")
+                actor_type, actor_id = "kurye", session.get("kurye_id")
 
             ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip() or None
             ua = request.headers.get("User-Agent") or None
-
             action = f"{request.method} {request.endpoint or path}"
-
             details = {
                 "path": path,
                 "status_code": int(getattr(response, "status_code", 0) or 0),
             }
 
             from .models import create_audit_log
-
             create_audit_log(
                 actor_type=actor_type,
                 actor_id=actor_id,
@@ -203,9 +190,7 @@ def create_app(config_class=Config):
                 user_agent=ua,
                 details=details,
             )
-
             db.session.commit()
-
         except Exception as e:
             try:
                 db.session.rollback()
