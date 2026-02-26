@@ -1,5 +1,5 @@
 ﻿# app/utils.py
-from flask import url_for, current_app, render_template
+from flask import url_for, current_app, render_template, session, redirect, flash
 from . import db, mail 
 from .models import Bildirimler, Kargolar, Ayarlar, KargoDurumEnum # KargoDurumEnum import edildi
 from decimal import Decimal
@@ -8,6 +8,41 @@ import re
 import json # kktc_konumlar için json.dumps kullanılacaksa (routes tarafında yapılıyor)
 from flask_mail import Message
 from threading import Thread
+from functools import wraps
+
+# --- YENİ EKLENEN YETKİLENDİRME KORUYUCULARI (P1 - Merkezi Auth) ---
+
+def admin_required(f):
+    """Sadece yöneticilerin erişimine izin veren decorator."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'admin_id' not in session:
+            flash('Bu sayfayı görüntülemek için yönetici olarak giriş yapmalısınız.', 'error')
+            return redirect(url_for('bp_admin.login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def isletme_required(f):
+    """Sadece işletmelerin erişimine izin veren decorator."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'isletme_id' not in session:
+            flash('Bu sayfayı görüntülemek için işletme olarak giriş yapmalısınız.', 'error')
+            return redirect(url_for('bp_business.login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def kurye_required(f):
+    """Sadece kuryelerin erişimine izin veren decorator."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'kurye_id' not in session:
+            flash('Bu sayfayı görüntülemek için kurye olarak giriş yapmalısınız.', 'error')
+            return redirect(url_for('bp_courier.login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# --- MEVCUT KKTC LOKASYON VERİSİ (Birebir Kopya) ---
 
 # KKTC Lokasyon Verisi (Önceki yanıtta tanımlandığı gibi)
 kktc_konumlar = {
@@ -40,6 +75,8 @@ kktc_konumlar = {
         # Eğer hem Güzelyurt'a hem Lefke'ye bağlı farklı Gaziveren bölgeleri varsa, isimleri ayırt edici olmalı.
     ]
 }
+
+# --- MEVCUT YARDIMCI FONKSİYONLAR (Birebir Kopya) ---
 
 def normalize_to_e164_tr(phone_number):
     """

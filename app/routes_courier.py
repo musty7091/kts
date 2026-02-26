@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
 from .models import Kuryeler, Kargolar, KargoDurumEnum, AdminKullanicilar 
 from . import db
-from .utils import create_notification 
+from .utils import kurye_required, create_notification 
 from werkzeug.security import check_password_hash
 from datetime import datetime
 
@@ -32,11 +32,9 @@ def login():
     return render_template('courier_login.html')
 
 @bp_courier.route('/dashboard')
+@kurye_required
 def dashboard():
-    if 'kurye_id' not in session:
-        flash('Bu sayfayı görüntülemek için kurye olarak giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_courier.login'))
-    
+    # @kurye_required sayesinde manuel session kontrolü kaldırıldı, içerik aynıdır.
     kurye_id = session['kurye_id']
     atanmis_aktif_kargolar = []
     tamamlanmis_kargolar = []
@@ -76,9 +74,9 @@ def dashboard():
         current_app.logger.error(f"Kurye ({kurye_id}) dashboard kargo listeleme hatası: {e}", exc_info=True)
         
     return render_template('courier_dashboard.html', 
-                           aktif_kargolar=atanmis_aktif_kargolar, 
-                           tamamlanmis_kargolar=tamamlanmis_kargolar,
-                           KargoDurumEnum=KargoDurumEnum)
+                            aktif_kargolar=atanmis_aktif_kargolar, 
+                            tamamlanmis_kargolar=tamamlanmis_kargolar,
+                            KargoDurumEnum=KargoDurumEnum)
 
 @bp_courier.route('/logout')
 def logout():
@@ -89,11 +87,8 @@ def logout():
     return redirect(url_for('bp_common.index'))
 
 @bp_courier.route('/shipment_action/<int:kargo_id>', methods=['GET', 'POST'])
+@kurye_required
 def shipment_action_by_courier(kargo_id):
-    if 'kurye_id' not in session:
-        flash('Bu işlemi yapmak için kurye olarak giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_courier.login'))
-
     kargo = Kargolar.query.filter_by(id=kargo_id, kurye_id=session['kurye_id']).first_or_404()
 
     # Kargonun mevcut durumuna göre kuryenin seçebileceği bir sonraki mantıksal durumlar
@@ -137,9 +132,7 @@ def shipment_action_by_courier(kargo_id):
                     eski_durum_value = kargo.kargo_durumu.value
                     kargo.kargo_durumu = yeni_durum_enum
                     
-                    # Kurye notunu güncelle (mevcut notun üzerine yazmak yerine, belki bir log tutulabilir veya eklenir)
-                    # Şimdilik, eğer kurye bir not girdiyse, kargonun özel notunu güncelleyelim.
-                    # Eğer işletme notu ile kurye notunu ayırmak isterseniz, Kargo modeline yeni bir alan eklenmeli.
+                    # Kurye notunu güncelle
                     if ozel_not_kurye: # Sadece kurye not girdiyse güncelle
                         kargo.ozel_not = ozel_not_kurye
 
@@ -147,7 +140,6 @@ def shipment_action_by_courier(kargo_id):
                         kargo.teslim_tarihi = datetime.now()
                         if kargo.odeme_yontemi_teslimde == "Kapıda Nakit":
                             kargo.odeme_durumu_alici = "Alıcıdan Nakit Tahsil Edildi (Kurye)"
-                        # Diğer kapıda ödeme durumları (örn: Kurye POS) burada ele alınabilir.
                     
                     db.session.commit()
 
@@ -165,7 +157,7 @@ def shipment_action_by_courier(kargo_id):
                     for admin in admin_users:
                         create_notification(
                             user_type='admin', user_id=admin.id,
-                            message=f"Kurye {session.get('kurye_ad_soyad', '')}, {kargo.takip_numarasi} nolu kargonun durumunu '{eski_durum_value}' -> '{yeni_durum_enum.value}' olarak güncelledi.",
+                            message=f"Kurye {session.get('kurye_ad_soyad', '')}, {kargo.takip_numarasi} nolu kargonun durumunu '{eski_durum_value}' -> '{yeni_durum_enum.value}' olarak güncellendi.",
                             link_endpoint='bp_admin.shipment_details', link_params={'kargo_id': kargo.id},
                             bildirim_tipi='kargo_durum_kurye_guncellemesi_admin'
                         )
@@ -186,6 +178,6 @@ def shipment_action_by_courier(kargo_id):
                 current_app.logger.error(f"Kurye kargo durum güncelleme hatası (Kargo ID: {kargo_id}): {e}", exc_info=True)
     
     return render_template('courier_shipment_action.html', 
-                           kargo=kargo, 
-                           kurye_guncellenebilir_durumlar=gecerli_sonraki_durumlar,
-                           KargoDurumEnum=KargoDurumEnum)
+                            kargo=kargo, 
+                            kurye_guncellenebilir_durumlar=gecerli_sonraki_durumlar,
+                            KargoDurumEnum=KargoDurumEnum)

@@ -156,7 +156,7 @@ def create_app(config_class=Config):
         try:
             path = request.path or ""
 
-            # SADECE admin/business/courier alanlarını URL prefix ile yakala (blueprint None olsa bile çalışır)
+            # SADECE admin/business/courier alanlarını URL prefix ile yakala
             if not (path.startswith("/admin") or path.startswith("/business") or path.startswith("/courier")):
                 return response
 
@@ -164,11 +164,11 @@ def create_app(config_class=Config):
             if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
                 return response
 
-            # Login POST'larını burada loglamıyoruz (başarı/başarısız ayrımı için route içinde)
+            # Login POST'larını burada loglamıyoruz
             if path in ("/admin/login", "/business/login", "/courier/login"):
                 return response
 
-            # Actor tespiti (RBAC'e paralel)
+            # Actor tespiti
             actor_type = "system"
             actor_id = None
             if path.startswith("/admin") and "admin_id" in session:
@@ -211,10 +211,7 @@ def create_app(config_class=Config):
                 db.session.rollback()
             except Exception:
                 pass
-
-            # Debug olmasa bile en azından WARNING basalım ki sahada görünür olsun
             current_app.logger.warning(f"Audit log yazılamadı: {e}")
-
             if app.debug:
                 current_app.logger.error(f"Audit log after_request hatası: {e}", exc_info=True)
 
@@ -322,14 +319,17 @@ def create_app(config_class=Config):
             else:
                 print(f"- '{ayar_kargo_ucreti_adi}' ayarı zaten mevcut: {sabit_kargo_ayari.ayar_degeri} TL.")
 
+            # ADMIN P0 FIX: Varsayılan şifre riskini temizle
             admin_kullanici_adi_str = os.environ.get("ADMIN_USER", "admin")
-            admin_sifre_str = os.environ.get("ADMIN_PASS", "")
+            admin_sifre_str = os.environ.get("ADMIN_PASS")
             admin_email_str = os.environ.get("ADMIN_EMAIL", "admin@example.com")
 
             if not admin_sifre_str:
-                admin_sifre_str = secrets.token_urlsafe(12)
-                print(f"- ADMIN_PASS ortam değişkeni bulunamadı. Geçici admin şifresi üretildi: {admin_sifre_str}")
-                print("  (Geliştirme için tamam. Prod/satış için mutlaka .env/ortam değişkeni ile ADMIN_PASS belirleyin.)")
+                # Ortam değişkeni yoksa rastgele güvenli şifre üret (P0 fix)
+                admin_sifre_str = secrets.token_urlsafe(16)
+                print(f"!!! GÜVENLİK UYARISI: ADMIN_PASS ortam değişkeni bulunamadı.")
+                print(f"!!! YENİ ÜRETİLEN GEÇİCİ ADMIN ŞİFRESİ: {admin_sifre_str}")
+                print("!!! Lütfen bu şifreyi kaydedin ve giriş yaptıktan sonra değiştirin.")
 
             admin_kullanicisi = models.AdminKullanicilar.query.filter_by(kullanici_adi=admin_kullanici_adi_str).first()
 
@@ -343,12 +343,14 @@ def create_app(config_class=Config):
                 db.session.add(yeni_admin)
                 print(f"- '{admin_kullanici_adi_str}' adlı admin kullanıcısı oluşturuldu.")
             else:
-                if not check_password_hash(admin_kullanicisi.sifre_hash, admin_sifre_str):
+                # Eğer env'den gelen şifre farklıysa güncelle (kolay yönetim için)
+                if admin_sifre_str and not check_password_hash(admin_kullanicisi.sifre_hash, admin_sifre_str):
                     admin_kullanicisi.sifre_hash = generate_password_hash(admin_sifre_str)
                     print(f"- '{admin_kullanici_adi_str}' adlı admin kullanıcısının şifresi güncellendi.")
                 else:
-                    print(f"- '{admin_kullanici_adi_str}' adlı admin kullanıcısı zaten mevcut ve şifresi güncel.")
+                    print(f"- '{admin_kullanici_adi_str}' adlı admin kullanıcısı zaten mevcut.")
 
+            # KURYE INIT-DATA
             kurye_kullanici_adi_str = os.environ.get("COURIER_USER", "kurye1")
             kurye_sifre_str = os.environ.get("COURIER_PASS", "kurye1sifre")
             kurye_ad_soyad_str = os.environ.get("COURIER_NAME", "Ali Kurye")
@@ -370,13 +372,14 @@ def create_app(config_class=Config):
 
             try:
                 db.session.commit()
-                print("Başlangıç verileri başarıyla eklendi/güncellendi.")
+                print("Başlangıç verileri başarıyla işlendi.")
             except Exception as e:
                 db.session.rollback()
                 print(f"Başlangıç verileri kaydedilirken hata oluştu: {str(e)}")
                 if app.debug:
                     current_app.logger.error(f"init-data commit hatası: {e}", exc_info=True)
 
+        # Blueprint'ler
         from .routes_admin import bp_admin
         app.register_blueprint(bp_admin)
 

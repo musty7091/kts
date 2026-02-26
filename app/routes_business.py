@@ -10,7 +10,7 @@ from .models import (
 )
 from . import db
 from .utils import (
-    create_notification, send_email_notification,
+    isletme_required, create_notification, send_email_notification,
     normalize_to_e164_tr, kktc_konumlar
 )
 from datetime import datetime, date
@@ -45,11 +45,9 @@ def login():
     return render_template('business_login.html')
 
 @bp_business.route('/dashboard')
+@isletme_required
 def dashboard():
-    if 'isletme_id' not in session:
-        flash('Bu sayfayı görüntülemek için işletme olarak giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_business.login'))
-
+    # @isletme_required sayesinde manuel session kontrolü kaldırıldı, içerik aynıdır.
     isletme_id_session = session['isletme_id']
     isletme_verileri = {}
 
@@ -150,11 +148,8 @@ def dashboard():
     return render_template('business_dashboard.html', KargoDurumEnum=KargoDurumEnum, **isletme_verileri)
 
 @bp_business.route('/add_shipment', methods=['GET', 'POST'])
+@isletme_required
 def add_shipment():
-    if 'isletme_id' not in session:
-        flash('Bu işlemi yapmak için işletme olarak giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_business.login'))
-
     isletme_baslangic_durumlari = [
         KargoDurumEnum.HAZIRLANIYOR,
         KargoDurumEnum.PAKETLENDI,
@@ -331,11 +326,8 @@ def add_shipment():
     return render_template('business_add_shipment.html', **template_context)
 
 @bp_business.route('/edit_shipment/<int:kargo_id>', methods=['GET', 'POST'])
+@isletme_required
 def edit_shipment(kargo_id):
-    if 'isletme_id' not in session:
-        flash('Bu işlemi yapmak için işletme olarak giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_business.login'))
-
     kargo = Kargolar.query.filter_by(id=kargo_id, isletme_id=session['isletme_id']).first_or_404()
     kktc_konumlar_json = json.dumps(kktc_konumlar)
 
@@ -467,11 +459,8 @@ def edit_shipment(kargo_id):
     return render_template('business_edit_shipment.html', **template_context)
 
 @bp_business.route('/change-password', methods=['GET', 'POST'])
+@isletme_required
 def change_password():
-    if 'isletme_id' not in session:
-        flash('Bu işlemi yapmak için işletme olarak giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_business.login'))
-
     isletme = Isletmeler.query.get_or_404(session['isletme_id'])
     form_data = {} 
 
@@ -524,10 +513,8 @@ def logout():
     return redirect(url_for('bp_common.index'))
 
 @bp_business.route('/update_status/<int:kargo_id>', methods=['GET', 'POST'])
+@isletme_required
 def update_shipment_status(kargo_id):
-    if 'isletme_id' not in session:
-        flash('Bu işlemi yapmak için işletme olarak giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_business.login'))
     kargo_obj = Kargolar.query.filter_by(id=kargo_id, isletme_id=session['isletme_id']).first_or_404()
 
     if kargo_obj.isletmeye_aktarildi_mi:
@@ -578,7 +565,7 @@ def update_shipment_status(kargo_id):
                         for admin_user in admin_users:
                             create_notification(
                                 user_type='admin', user_id=admin_user.id,
-                                message=f"'{kargo_obj.isletme.isletme_adi}' işletmesi, {kargo_obj.takip_numarasi} nolu kargonun durumunu '{eski_durum_value}' -> '{yeni_durum_enum.value}' olarak güncelledi.",
+                                message=f"'{kargo_obj.isletme.isletme_adi}' işletmesi, {kargo_obj.takip_numarasi} nolu kargonun durumunu '{eski_durum_value}' -> '{yeni_durum_enum.value}' olarak güncellendi.",
                                 link_endpoint='bp_admin.shipment_details', link_params={'kargo_id': kargo_obj.id},
                                 bildirim_tipi='kargo_durum_isletme_guncellemesi'
                             )
@@ -600,10 +587,8 @@ def update_shipment_status(kargo_id):
     return render_template('business_update_shipment_status.html', kargo=kargo_obj, guncellenebilir_durumlar=gecerli_sonraki_durumlar_isletme, form_data=form_data_on_error, can_update_by_business=can_update_by_business, KargoDurumEnum=KargoDurumEnum)
 
 @bp_business.route('/payments')
+@isletme_required
 def payments():
-    if 'isletme_id' not in session:
-        flash('Bu sayfayı görüntülemek için işletme olarak giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_business.login'))
     isletme_id_session = session['isletme_id']
     try:
         isletmenin_odemeleri = IsletmeOdemeleri.query.filter_by(isletme_id=isletme_id_session).order_by(IsletmeOdemeleri.odeme_tarihi.desc()).all()
@@ -614,10 +599,8 @@ def payments():
     return render_template('business_payments.html', odemeler=isletmenin_odemeleri)
 
 @bp_business.route('/payment_details/<int:odeme_id>')
+@isletme_required
 def payment_details(odeme_id):
-    if 'isletme_id' not in session:
-        flash('Bu sayfayı görüntülemek için işletme olarak giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_business.login'))
     isletme_id_session = session['isletme_id']
     odeme_obj = None
     iliskili_kargolar = []
@@ -632,10 +615,8 @@ def payment_details(odeme_id):
     return render_template('business_payment_details.html', odeme_detayi=odeme_obj, iliskili_kargolar=iliskili_kargolar)
 
 @bp_business.route('/shipment_details/<int:kargo_id>')
+@isletme_required
 def shipment_details(kargo_id):
-    if 'isletme_id' not in session:
-        flash('Bu sayfayı görüntülemek için işletme olarak giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_business.login'))
     isletme_id_session = session['isletme_id']
     kargo = Kargolar.query.filter_by(id=kargo_id, isletme_id=isletme_id_session).first_or_404()
     return render_template('shipment_details.html', kargo=kargo, KargoDurumEnum=KargoDurumEnum)

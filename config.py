@@ -38,22 +38,25 @@ class Config:
     TESTING = _env_bool("TESTING", False)
 
     # ------------------------
-    # SECRET_KEY (P0 - kritik)
+    # SECRET_KEY (P0 - kritik) - GÜNCELLENDİ
     # ------------------------
-    # Eğer dışarıdan bir anahtar verilmezse, çökmemesi için varsayılan bir anahtar belirledik.
-    _secret = _env_str("SECRET_KEY", "beecargo_sabit_gizli_anahtar_2026_xyz")
-    if _secret:
-        SECRET_KEY = _secret
+    # Raporun P0 uyarısı doğrultusunda: 
+    # Prod ortamında isek 'SECRET_KEY' mutlaka dışarıdan (env) gelmeli.
+    _is_prod_like = not (TESTING or DEBUG or FLASK_ENV in ("development", "dev", "testing"))
+    _secret_from_env = os.environ.get("SECRET_KEY")
+
+    if _secret_from_env:
+        SECRET_KEY = _secret_from_env
     else:
-        # Dev/Test'te kolaylık: otomatik üret
-        if TESTING or DEBUG or FLASK_ENV in ("development", "dev", "testing"):
-            SECRET_KEY = secrets.token_hex(32)
-        else:
-            # Prod/SaaS için: zorunlu
+        if _is_prod_like:
+            # Üretim ortamında (Production) anahtar yoksa UYGULAMAYI DURDUR (En güvenli yöntem)
             raise RuntimeError(
-                "SECRET_KEY ortam değişkeni PROD ortamında zorunludur. "
-                "Örn: export SECRET_KEY='uzun-rastgele-bir-deger'"
+                "KRİTİK GÜVENLİK RİSKİ: SECRET_KEY ortam değişkeni PRODUCTION ortamında zorunludur! "
+                "Lütfen sunucu ayarlarından SECRET_KEY tanımlayın."
             )
+        else:
+            # Sadece geliştirme/test ortamında ise kolaylık için geçici anahtar ata
+            SECRET_KEY = "beecargo_yerel_gelistirme_anahtari_2026_xyz"
 
     # ------------------------
     # DB
@@ -74,9 +77,6 @@ class Config:
     # ------------------------
     # Session / Cookie Güvenliği
     # ------------------------
-    # Prod varsayılanı: HTTPS kabul edip secure cookie'yi true yap
-    _is_prod_like = not (TESTING or DEBUG or FLASK_ENV in ("development", "dev", "testing"))
-
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = _env_str("SESSION_COOKIE_SAMESITE", "Lax")
 
@@ -113,3 +113,6 @@ class Config:
     MAIL_DEFAULT_SENDER = (MAIL_DEFAULT_SENDER_NAME, MAIL_DEFAULT_SENDER_EMAIL)
 
     SITE_NAME = _env_str("SITE_NAME", "BeeCargo")
+    
+    # Dosya Yükleme Yolu
+    UPLOAD_FOLDER = os.path.join(basedir, 'app', 'static', 'uploads')

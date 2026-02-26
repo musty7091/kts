@@ -6,7 +6,7 @@ from .models import (
     IsletmeOdemeleri, OdemeKargoIliskileri, Bildirimler, KargoDurumEnum, Kuryeler
 )
 from . import db
-from .utils import create_notification, calculate_business_earnings, normalize_to_e164_tr
+from .utils import admin_required, create_notification, calculate_business_earnings, normalize_to_e164_tr
 from datetime import datetime, date
 from decimal import Decimal, InvalidOperation
 from sqlalchemy import func, or_
@@ -36,11 +36,10 @@ def login():
     return render_template('login.html')
 
 @bp_admin.route('/dashboard')
+@admin_required
 def dashboard():
-    if 'admin_id' not in session:
-        flash('Bu sayfayı görüntülemek için giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_admin.login'))
-
+    # Merkezi kontrol (@admin_required) sayesinde manuel session kontrolü kaldırıldı, 
+    # ancak fonksiyon içeriği tamamen aynıdır.
     isletmeler_listesi = []
     query = Isletmeler.query.filter_by(aktif_mi=True)
 
@@ -74,11 +73,8 @@ def logout():
     return redirect(url_for('bp_common.index'))
 
 @bp_admin.route('/add_business', methods=['GET', 'POST'])
+@admin_required
 def add_business():
-    if 'admin_id' not in session:
-        flash('Bu işlemi yapmak için giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_admin.login'))
-
     form_data_on_error = {}
     if request.method == 'POST':
         form_data_on_error = request.form
@@ -151,10 +147,8 @@ def add_business():
     return render_template('admin_add_business.html', form_data=form_data_on_error)
 
 @bp_admin.route('/edit_business/<int:isletme_id>', methods=['GET', 'POST'])
+@admin_required
 def edit_business(isletme_id):
-    if 'admin_id' not in session:
-        flash('Bu işlemi yapmak için giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_admin.login'))
     isletme_to_edit = Isletmeler.query.get_or_404(isletme_id)
 
     if request.method == 'POST':
@@ -209,11 +203,8 @@ def edit_business(isletme_id):
     return render_template('admin_edit_business.html', isletme=isletme_to_edit)
 
 @bp_admin.route('/add_courier', methods=['GET', 'POST'])
+@admin_required
 def add_courier():
-    if 'admin_id' not in session:
-        flash('Bu işlemi yapmak için giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_admin.login'))
-    
     form_data_on_error = {}
     if request.method == 'POST':
         form_data_on_error = request.form
@@ -290,11 +281,8 @@ def add_courier():
     return render_template('admin_add_courier.html', form_data=form_data_on_error)
 
 @bp_admin.route('/couriers')
+@admin_required
 def list_couriers():
-    if 'admin_id' not in session:
-        flash('Bu sayfayı görüntülemek için giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_admin.login'))
-    
     try:
         kuryeler = Kuryeler.query.order_by(Kuryeler.aktif_mi.desc(), Kuryeler.ad_soyad).all()
     except Exception as e:
@@ -304,11 +292,8 @@ def list_couriers():
     return render_template('admin_list_couriers.html', kuryeler=kuryeler)
 
 @bp_admin.route('/edit_courier/<int:kurye_id>', methods=['GET', 'POST'])
+@admin_required
 def edit_courier(kurye_id):
-    if 'admin_id' not in session:
-        flash('Bu işlemi yapmak için giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_admin.login'))
-    
     kurye_to_edit = Kuryeler.query.get_or_404(kurye_id)
     form_data_on_error = {} 
 
@@ -383,11 +368,8 @@ def edit_courier(kurye_id):
     return render_template('admin_edit_courier.html', kurye=kurye_to_edit, form_data=get_form_data)
 
 @bp_admin.route('/settings', methods=['GET', 'POST'])
+@admin_required
 def settings():
-    if 'admin_id' not in session:
-        flash('Bu işlemi yapmak için admin olarak giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_admin.login'))
-
     current_admin_user = AdminKullanicilar.query.get(session['admin_id'])
     if not current_admin_user: 
         flash('Admin kullanıcı bilgileri bulunamadı. Lütfen tekrar giriş yapın.', 'error')
@@ -479,11 +461,8 @@ def settings():
     return render_template('admin_settings.html', ayarlar=ayarlar_dict, current_admin=current_admin_user, password_form_data=password_form_data)
 
 @bp_admin.route('/all_shipments')
+@admin_required
 def all_shipments():
-    if 'admin_id' not in session:
-        flash('Bu sayfayı görüntülemek için giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_admin.login'))
-
     query = Kargolar.query.join(Isletmeler)
     
     takip_no_search = request.args.get('takip_no', '').strip()
@@ -538,10 +517,8 @@ def all_shipments():
     return render_template('admin_all_shipments.html', kargolar=tum_kargolar, KargoDurumEnum=KargoDurumEnum)
 
 @bp_admin.route('/update_shipment_status/<int:kargo_id>', methods=['GET', 'POST'])
+@admin_required
 def update_shipment_status(kargo_id):
-    if 'admin_id' not in session:
-        flash('Bu işlemi yapmak için admin olarak giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_admin.login'))
     kargo = Kargolar.query.get_or_404(kargo_id)
     
     admin_guncellenebilir_durumlar = [
@@ -609,11 +586,8 @@ def update_shipment_status(kargo_id):
     return render_template('admin_update_shipment_status.html', kargo=kargo, admin_guncellenebilir_durumlar=admin_guncellenebilir_durumlar, form_data=form_data_on_error)
 
 @bp_admin.route('/scan_shipment_status', methods=['GET', 'POST'])
+@admin_required
 def scan_shipment_status():
-    if 'admin_id' not in session:
-        flash('Bu işlemi yapmak için admin olarak giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_admin.login'))
-    
     if request.method == 'POST':
         takip_no_scanned = request.form.get('takip_no_scanned', '').strip()
         if not takip_no_scanned:
@@ -632,19 +606,14 @@ def scan_shipment_status():
     return render_template('admin_scan_shipment.html')
 
 @bp_admin.route('/shipment_details/<int:kargo_id>')
+@admin_required
 def shipment_details(kargo_id):
-    if 'admin_id' not in session:
-        flash('Bu sayfayı görüntülemek için admin olarak giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_admin.login'))
     kargo = Kargolar.query.get_or_404(kargo_id)
     return render_template('shipment_details.html', kargo=kargo, KargoDurumEnum=KargoDurumEnum)
 
 @bp_admin.route('/assign_courier/<int:kargo_id>', methods=['GET', 'POST'])
+@admin_required
 def assign_courier(kargo_id):
-    if 'admin_id' not in session:
-        flash('Bu işlemi yapmak için admin olarak giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_admin.login'))
-    
     kargo = Kargolar.query.get_or_404(kargo_id)
     
     non_assignable_final_statuses = [
@@ -711,11 +680,8 @@ def assign_courier(kargo_id):
     return render_template('admin_assign_courier.html', kargo=kargo, kuryeler=aktif_kuryeler, KargoDurumEnum=KargoDurumEnum)
 
 @bp_admin.route('/reports', methods=['GET', 'POST'])
+@admin_required
 def reports():
-    if 'admin_id' not in session:
-        flash('Bu sayfayı görüntülemek için giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_admin.login'))
-
     report_data = None
     start_date_str = request.form.get('start_date') if request.method == 'POST' else request.args.get('start_date')
     end_date_str = request.form.get('end_date') if request.method == 'POST' else request.args.get('end_date')
@@ -815,11 +781,8 @@ def reports():
     return render_template('admin_reports.html', report_data=report_data, form_dates=form_dates_for_template)
 
 @bp_admin.route('/courier_reports', methods=['GET', 'POST'])
+@admin_required
 def courier_reports():
-    if 'admin_id' not in session:
-        flash('Bu sayfayı görüntülemek için giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_admin.login'))
-
     report_data = None
     start_date_str = request.form.get('start_date') if request.method == 'POST' else request.args.get('start_date')
     end_date_str = request.form.get('end_date') if request.method == 'POST' else request.args.get('end_date')
@@ -887,11 +850,8 @@ def courier_reports():
     return render_template('admin_courier_reports.html', report_data=report_data, form_dates=form_dates_for_template)
 
 @bp_admin.route('/isletme_bakiyeleri')
+@admin_required
 def isletme_bakiyeleri():
-    if 'admin_id' not in session:
-        flash('Bu sayfayı görüntülemek için giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_admin.login'))
-
     isletme_verileri_liste = []
     isletme_query = Isletmeler.query.filter_by(aktif_mi=True)
     search_term = request.args.get('q_bakiye_isletme', '').strip()
@@ -956,11 +916,8 @@ def isletme_bakiyeleri():
     return render_template('admin_isletme_bakiyeleri.html', isletme_verileri=isletme_verileri_liste)
 
 @bp_admin.route('/record_payment/<int:isletme_id>', methods=['GET', 'POST'])
+@admin_required
 def record_payment(isletme_id):
-        if 'admin_id' not in session:
-            flash('Bu işlemi yapmak için admin olarak giriş yapmalısınız.', 'error')
-            return redirect(url_for('bp_admin.login'))
-
         isletme_obj_payment = Isletmeler.query.get_or_404(isletme_id)
         
         mahsuplasacak_kargolar_db = Kargolar.query.filter(
@@ -1066,11 +1023,8 @@ def record_payment(isletme_id):
         return render_template('admin_record_payment.html', isletme=isletme_obj_payment, kargolar_data=kargolar_data_template, today_date=today_date_str)
 
 @bp_admin.route('/business_payment_history/<int:isletme_id>')
+@admin_required
 def business_payment_history(isletme_id):
-    if 'admin_id' not in session:
-        flash('Bu sayfayı görüntülemek için giriş yapmalısınız.', 'error')
-        return redirect(url_for('bp_admin.login'))
-    
     isletme = Isletmeler.query.get_or_404(isletme_id)
     try:
         odemeler_db = IsletmeOdemeleri.query.filter_by(isletme_id=isletme_id).order_by(IsletmeOdemeleri.odeme_tarihi.desc()).all()
