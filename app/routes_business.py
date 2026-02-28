@@ -20,14 +20,22 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 bp_business = Blueprint('bp_business', __name__, template_folder='templates', url_prefix='/business')
 
+
 @bp_business.route('/login', methods=['GET', 'POST'])
 def login():
     if 'isletme_id' in session:
         return redirect(url_for('bp_business.dashboard'))
+
     if request.method == 'POST':
-        kullanici_adi = request.form.get('kullanici_adi')
-        sifre = request.form.get('sifre')
+        kullanici_adi = (request.form.get('kullanici_adi') or '').strip()
+        sifre = request.form.get('sifre') or ''
+
+        if not kullanici_adi or not sifre:
+            flash('Kullanıcı adı ve şifre zorunludur.', 'error')
+            return redirect(url_for('bp_business.login'))
+
         isletme_obj = Isletmeler.query.filter_by(kullanici_adi=kullanici_adi).first()
+
         if isletme_obj and isletme_obj.aktif_mi and check_password_hash(isletme_obj.sifre_hash, sifre):
             session.clear()
             session.permanent = True
@@ -35,14 +43,19 @@ def login():
             session['isletme_id'] = isletme_obj.id
             session['isletme_kullanici_adi'] = isletme_obj.kullanici_adi
             session['isletme_adi'] = isletme_obj.isletme_adi
+
             flash('İşletme olarak başarıyla giriş yaptınız!', 'success')
             return redirect(url_for('bp_business.dashboard'))
+
         elif isletme_obj and not isletme_obj.aktif_mi:
             flash('İşletme hesabınız pasif durumdadır. Lütfen yönetici ile iletişime geçin.', 'error')
         else:
             flash('Kullanıcı adı veya şifre hatalı.', 'error')
+
         return redirect(url_for('bp_business.login'))
+
     return render_template('business_login.html')
+
 
 @bp_business.route('/dashboard')
 @isletme_required
@@ -94,10 +107,12 @@ def dashboard():
     try:
         isletmenin_kargolari = query.order_by(Kargolar.olusturulma_tarihi.desc()).all()
         isletme_verileri['kargolar'] = isletmenin_kargolari
-        
+
         # Temel Kargo İstatistikleri
         isletme_verileri['toplam_kargo_sayisi'] = Kargolar.query.filter_by(isletme_id=isletme_id_session).count()
-        isletme_verileri['teslim_edilen_kargo_sayisi'] = Kargolar.query.filter_by(isletme_id=isletme_id_session, kargo_durumu=KargoDurumEnum.TESLIM_EDILDI).count()
+        isletme_verileri['teslim_edilen_kargo_sayisi'] = Kargolar.query.filter_by(
+            isletme_id=isletme_id_session, kargo_durumu=KargoDurumEnum.TESLIM_EDILDI
+        ).count()
 
     except Exception as e:
         flash(f"Kargolar listelenirken bir hata oluştu: {str(e)}", "error")
@@ -108,7 +123,7 @@ def dashboard():
 
     try:
         # İŞLETME HESAP ÖZETİ HESAPLAMALARI (Sadece Teslim Edilmiş ve Mahsuplaşmamış olanlar)
-        
+
         # 1. İşletmenin kargo firmasından alacağı (Kapıda nakit tahsil edilen ürün bedelleri)
         bekleyen_tahsilat = db.session.query(
             func.sum(Kargolar.isletmeye_aktarilacak_tutar)
@@ -134,7 +149,9 @@ def dashboard():
         isletme_verileri['bekleyen_hizmet_bedeli'] = bekleyen_hizmet_bedeli
         isletme_verileri['guncel_net_bakiye'] = guncel_net_bakiye
 
-        son_odemeler = IsletmeOdemeleri.query.filter_by(isletme_id=isletme_id_session).order_by(IsletmeOdemeleri.odeme_tarihi.desc()).limit(5).all()
+        son_odemeler = IsletmeOdemeleri.query.filter_by(isletme_id=isletme_id_session).order_by(
+            IsletmeOdemeleri.odeme_tarihi.desc()
+        ).limit(5).all()
         isletme_verileri['son_odemeler'] = son_odemeler
 
     except Exception as e:
@@ -146,6 +163,7 @@ def dashboard():
         isletme_verileri['son_odemeler'] = []
 
     return render_template('business_dashboard.html', KargoDurumEnum=KargoDurumEnum, **isletme_verileri)
+
 
 @bp_business.route('/add_shipment', methods=['GET', 'POST'])
 @isletme_required
@@ -247,7 +265,8 @@ def add_shipment():
                     mevcut_kargo_isletme_borcu = Decimal('0.00')
                 else:
                     mevcut_kargo_isletme_borcu = standart_hizmet_bedeli - kargo_ucreti_alici_tahsil_decimal
-                    if mevcut_kargo_isletme_borcu < 0: mevcut_kargo_isletme_borcu = Decimal('0.00')
+                    if mevcut_kargo_isletme_borcu < 0:
+                        mevcut_kargo_isletme_borcu = Decimal('0.00')
                 odeme_durumu_alici_yeni = "Alıcıdan Ödeme Bekleniyor"
 
             yeni_kargo = Kargolar(
@@ -288,7 +307,10 @@ def add_shipment():
                     db.session.commit()
             except Exception as e_notify_admin:
                 db.session.rollback()
-                current_app.logger.error(f"Yeni kargo ({yeni_kargo.takip_numarasi}) için admin bildirimi oluşturulurken hata: {e_notify_admin}", exc_info=True)
+                current_app.logger.error(
+                    f"Yeni kargo ({yeni_kargo.takip_numarasi}) için admin bildirimi oluşturulurken hata: {e_notify_admin}",
+                    exc_info=True
+                )
 
             if yeni_kargo.alici_email:
                 email_subject_str = f"{current_app.config.get('SITE_NAME', 'BeeCargo')} - Kargonuz Hazırlanıyor ({yeni_kargo.takip_numarasi})"
@@ -324,6 +346,7 @@ def add_shipment():
             return render_template('business_add_shipment.html', **template_context)
 
     return render_template('business_add_shipment.html', **template_context)
+
 
 @bp_business.route('/edit_shipment/<int:kargo_id>', methods=['GET', 'POST'])
 @isletme_required
@@ -425,10 +448,12 @@ def edit_shipment(kargo_id):
                         mevcut_kargo_isletme_borcu_guncel = Decimal('0.00')
                     else:
                         mevcut_kargo_isletme_borcu_guncel = standart_hizmet_bedeli - kargo.kargo_ucreti_alici_tahsil
-                        if mevcut_kargo_isletme_borcu_guncel < 0: mevcut_kargo_isletme_borcu_guncel = Decimal('0.00')
+                        if mevcut_kargo_isletme_borcu_guncel < 0:
+                            mevcut_kargo_isletme_borcu_guncel = Decimal('0.00')
 
                 kargo.isletmeye_aktarilacak_tutar = isletmeye_aktarilacak_guncel
                 kargo.kargo_ucreti_isletme_borcu = mevcut_kargo_isletme_borcu_guncel
+
             except InvalidOperation:
                 flash('Lütfen geçerli bir ürün bedeli veya kargo ücreti girin (örn: 123.45).', 'error')
                 return render_template('business_edit_shipment.html', **template_context)
@@ -456,16 +481,18 @@ def edit_shipment(kargo_id):
             'urun_bedeli_alici_tahsil': str(kargo.urun_bedeli_alici_tahsil),
             'kargo_ucreti_alici_tahsil': str(kargo.kargo_ucreti_alici_tahsil)
         }
+
     return render_template('business_edit_shipment.html', **template_context)
+
 
 @bp_business.route('/change-password', methods=['GET', 'POST'])
 @isletme_required
 def change_password():
     isletme = Isletmeler.query.get_or_404(session['isletme_id'])
-    form_data = {} 
+    form_data = {}
 
     if request.method == 'POST':
-        form_data = request.form.to_dict() 
+        form_data = request.form.to_dict()
         current_password = request.form.get('current_password')
         new_password = request.form.get('new_password')
         confirm_new_password = request.form.get('confirm_new_password')
@@ -480,14 +507,20 @@ def change_password():
             form_data['confirm_new_password'] = ''
         else:
             errors = []
-            if len(new_password) < 8: errors.append("Yeni şifre en az 8 karakter olmalıdır.")
-            if not re.search(r"[A-Z]", new_password): errors.append("Yeni şifre en az bir büyük harf içermelidir.")
-            if not re.search(r"[a-z]", new_password): errors.append("Yeni şifre en az bir küçük harf içermelidir.")
-            if not re.search(r"[0-9]", new_password): errors.append("Yeni şifre en az bir rakam içermelidir.")
-            if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?~`]", new_password): errors.append("Yeni şifre en az bir özel karakter içermelidir.")
+            if len(new_password) < 8:
+                errors.append("Yeni şifre en az 8 karakter olmalıdır.")
+            if not re.search(r"[A-Z]", new_password):
+                errors.append("Yeni şifre en az bir büyük harf içermelidir.")
+            if not re.search(r"[a-z]", new_password):
+                errors.append("Yeni şifre en az bir küçük harf içermelidir.")
+            if not re.search(r"[0-9]", new_password):
+                errors.append("Yeni şifre en az bir rakam içermelidir.")
+            if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?~`]", new_password):
+                errors.append("Yeni şifre en az bir özel karakter içermelidir.")
 
             if errors:
-                for error_msg in errors: flash(error_msg, 'error')
+                for error_msg in errors:
+                    flash(error_msg, 'error')
                 form_data['new_password'] = ''
                 form_data['confirm_new_password'] = ''
             else:
@@ -506,11 +539,13 @@ def change_password():
 
     return render_template('business_change_password.html', isletme=isletme, form_data=form_data)
 
+
 @bp_business.route('/logout')
 def logout():
     session.clear()
     flash('Başarıyla çıkış yaptınız.', 'success')
     return redirect(url_for('bp_common.index'))
+
 
 @bp_business.route('/update_status/<int:kargo_id>', methods=['GET', 'POST'])
 @isletme_required
@@ -582,9 +617,24 @@ def update_shipment_status(kargo_id):
         else:
             flash("Lütfen yeni bir kargo durumu seçin.", 'error')
 
-        return render_template('business_update_shipment_status.html', kargo=kargo_obj, guncellenebilir_durumlar=gecerli_sonraki_durumlar_isletme, form_data=form_data_on_error, can_update_by_business=can_update_by_business, KargoDurumEnum=KargoDurumEnum)
+        return render_template(
+            'business_update_shipment_status.html',
+            kargo=kargo_obj,
+            guncellenebilir_durumlar=gecerli_sonraki_durumlar_isletme,
+            form_data=form_data_on_error,
+            can_update_by_business=can_update_by_business,
+            KargoDurumEnum=KargoDurumEnum
+        )
 
-    return render_template('business_update_shipment_status.html', kargo=kargo_obj, guncellenebilir_durumlar=gecerli_sonraki_durumlar_isletme, form_data=form_data_on_error, can_update_by_business=can_update_by_business, KargoDurumEnum=KargoDurumEnum)
+    return render_template(
+        'business_update_shipment_status.html',
+        kargo=kargo_obj,
+        guncellenebilir_durumlar=gecerli_sonraki_durumlar_isletme,
+        form_data=form_data_on_error,
+        can_update_by_business=can_update_by_business,
+        KargoDurumEnum=KargoDurumEnum
+    )
+
 
 @bp_business.route('/payments')
 @isletme_required
@@ -597,6 +647,7 @@ def payments():
         current_app.logger.error(f"İşletme ödeme geçmişi getirme hatası: {e}", exc_info=True)
         isletmenin_odemeleri = []
     return render_template('business_payments.html', odemeler=isletmenin_odemeleri)
+
 
 @bp_business.route('/payment_details/<int:odeme_id>')
 @isletme_required
@@ -613,6 +664,7 @@ def payment_details(odeme_id):
         flash(f"Ödeme detayları getirilirken bir hata oluştu: {str(e)}", "error")
         current_app.logger.error(f"İşletme ödeme detayı ({odeme_id}) getirme hatası: {e}", exc_info=True)
     return render_template('business_payment_details.html', odeme_detayi=odeme_obj, iliskili_kargolar=iliskili_kargolar)
+
 
 @bp_business.route('/shipment_details/<int:kargo_id>')
 @isletme_required

@@ -1,5 +1,5 @@
 ﻿# app/routes_admin.py
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app, abort
 from werkzeug.security import check_password_hash, generate_password_hash
 from .models import (
     AdminKullanicilar, Isletmeler, Kargolar, Ayarlar, 
@@ -7,7 +7,7 @@ from .models import (
 )
 from . import db
 from .utils import admin_required, create_notification, calculate_business_earnings, normalize_to_e164_tr
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from decimal import Decimal, InvalidOperation
 from sqlalchemy import func, or_
 import re 
@@ -22,7 +22,26 @@ def login():
         kullanici_adi = request.form.get('kullanici_adi')
         sifre = request.form.get('sifre')
         admin = AdminKullanicilar.query.filter_by(kullanici_adi=kullanici_adi).first()
+
+        path = request.path or ""
+        ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip() or "unknown"
+        now = datetime.now()
+
+        # --- Başarılı giriş: throttle kaydını temizle ---
         if admin and check_password_hash(admin.sifre_hash, sifre):
+            try:
+                from .models import LoginAttempt
+                attempt = LoginAttempt.query.filter_by(ip=ip, path=path).first()
+                if attempt:
+                    db.session.delete(attempt)
+                    db.session.commit()
+            except Exception as e:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                current_app.logger.warning(f"Login throttle reset yazılamadı: {e}")
+
             session.clear()
             session.permanent = True
 
@@ -30,9 +49,45 @@ def login():
             session['admin_kullanici_adi'] = admin.kullanici_adi
             flash('Giriş başarılı!', 'success')
             return redirect(url_for('bp_admin.dashboard'))
-        else:
-            flash('Kullanıcı adı veya şifre hatalı.', 'error')
-            return redirect(url_for('bp_admin.login'))
+
+        # --- Başarısız giriş: sadece burada sayaç artır ---
+        try:
+            from .models import LoginAttempt
+            attempt = LoginAttempt.query.filter_by(ip=ip, path=path).first()
+
+            # Engel süresi dolduysa kaydı temizle
+            if attempt and attempt.blocked_until and now > attempt.blocked_until:
+                db.session.delete(attempt)
+                db.session.commit()
+                attempt = None
+
+            if not attempt:
+                attempt = LoginAttempt(ip=ip, path=path, count=1, last_attempt_at=now)
+                db.session.add(attempt)
+            else:
+                attempt.count += 1
+                attempt.last_attempt_at = now
+
+            if attempt.count > 30:
+                attempt.blocked_until = now + timedelta(minutes=15)
+                current_app.logger.warning(
+                    f"Login throttle TRIGGER: ip={ip} path={path} count={attempt.count}"
+                )
+
+            db.session.commit()
+
+            # Bu denemeyle bloklandıysa hemen 429 ver
+            if attempt.blocked_until and now < attempt.blocked_until:
+                abort(429)
+        except Exception as e:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            current_app.logger.warning(f"Login throttle yazılamadı: {e}")
+
+        flash('Kullanıcı adı veya şifre hatalı.', 'error')
+        return redirect(url_for('bp_admin.login'))
     return render_template('login.html')
 
 @bp_admin.route('/dashboard')

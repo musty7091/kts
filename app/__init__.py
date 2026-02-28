@@ -63,6 +63,12 @@ def create_app(config_class=Config):
     # -------------------------
     @app.before_request
     def _login_throttle_guard():
+        """
+        Login brute-force koruması:
+        - Bu guard SADECE engel süresi (blocked_until) aktif mi diye kontrol eder.
+        - Sayaç (count) artırma işi login route'larının içinde, yalnızca BAŞARISIZ girişte yapılmalıdır.
+        - Başarılı girişte ise sayaç kaydı sıfırlanmalı/silinmelidir (login route içinde).
+        """
         if request.method != "POST":
             return None
 
@@ -71,35 +77,23 @@ def create_app(config_class=Config):
             return None
 
         ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip() or "unknown"
-        
+
         from .models import LoginAttempt
         attempt = LoginAttempt.query.filter_by(ip=ip, path=path).first()
         now = datetime.now()
 
+        # Engel süresi dolduysa kaydı temizle
         if attempt and attempt.blocked_until and now > attempt.blocked_until:
             db.session.delete(attempt)
             db.session.commit()
             attempt = None
 
+        # Engel devam ediyorsa durdur
         if attempt and attempt.blocked_until and now < attempt.blocked_until:
             current_app.logger.warning(f"Login throttle BLOCK: ip={ip} path={path}")
             abort(429)
 
-        if not attempt:
-            attempt = LoginAttempt(ip=ip, path=path, count=1, last_attempt_at=now)
-            db.session.add(attempt)
-        else:
-            attempt.count += 1
-            attempt.last_attempt_at = now
-
-        if attempt.count > 30:
-            attempt.blocked_until = datetime.now() + timedelta(minutes=15)
-            current_app.logger.warning(f"Login throttle TRIGGER: ip={ip} path={path} count={attempt.count}")
-        
-        db.session.commit()
-
-        if attempt.blocked_until and now < attempt.blocked_until:
-            abort(429)
+        return None
 
     @app.errorhandler(429)
     def _too_many_requests(e):
