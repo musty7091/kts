@@ -1,23 +1,73 @@
 ﻿# app/__init__.py
 import os
 import secrets
-import time
-from flask import Flask, current_app, session, url_for, request, abort, redirect, flash
-from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+
+from flask import Flask, abort, current_app, flash, redirect, request, session, url_for
+from flask_mail import Mail
 from flask_migrate import Migrate
-from flask_mail import Mail  # Flask-Mail importu
-from config import Config
-from werkzeug.security import generate_password_hash, check_password_hash
-from decimal import Decimal
-from datetime import datetime, timedelta
+from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.security import check_password_hash, generate_password_hash
+from sqlalchemy import inspect
+
+from config import Config
 
 # Eklenti nesnelerini global olarak tanımla
 db = SQLAlchemy()
 migrate = Migrate()
-mail = Mail()  # Mail nesnesi burada global olarak tanımlanıyor
+mail = Mail()
 csrf = CSRFProtect()
+
+
+AUDITED_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+LOGIN_PATHS = {"/admin/login", "/business/login", "/courier/login"}
+PROTECTED_PREFIXES = ("/admin", "/business", "/courier")
+
+
+def _client_ip() -> str:
+    return (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip() or "unknown"
+
+
+def _is_prod_like(app: Flask) -> bool:
+    return not (app.debug or app.testing)
+
+
+def _audit_table_exists() -> bool:
+    try:
+        inspector = inspect(db.engine)
+        return "audit_log" in inspector.get_table_names()
+    except Exception:
+        return False
+
+
+def _build_csp(app: Flask) -> str:
+    script_src = "'self' 'unsafe-inline' https://code.jquery.com https://cdn.jsdelivr.net https://stackpath.bootstrapcdn.com"
+    style_src = "'self' 'unsafe-inline' https://stackpath.bootstrapcdn.com https://cdnjs.cloudflare.com https://fonts.googleapis.com"
+    img_src = "'self' data: blob: https:"
+    font_src = "'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com"
+
+    if app.debug or app.testing:
+        script_src += " 'unsafe-eval'"
+        connect_src = "'self' ws: wss: https:"
+    else:
+        connect_src = "'self' https:"
+
+    return "; ".join(
+        [
+            "default-src 'self'",
+            f"script-src {script_src}",
+            f"style-src {style_src}",
+            f"img-src {img_src}",
+            f"font-src {font_src}",
+            f"connect-src {connect_src}",
+            "frame-ancestors 'none'",
+            "base-uri 'self'",
+            "form-action 'self'",
+            "object-src 'none'",
+        ]
+    )
 
 
 def create_app(config_class=Config):
@@ -30,17 +80,21 @@ def create_app(config_class=Config):
         )
 
     try:
-        os.makedirs(app.instance_path, exist_ok=True)  # 'instance' klasörünü oluştur (varsa hata vermez)
+        os.makedirs(app.instance_path, exist_ok=True)
     except OSError:
         pass
 
+    db.init_app(app)
+    migrate.init_app(app, db)
+    mail.init_app(app)
+    csrf.init_app(app)
+
     # -------------------------
-    # P0: Reverse proxy düzeltmesi (HTTPS şeması / gerçek IP)
+    # Reverse proxy düzeltmesi (HTTPS şeması / gerçek IP)
     # -------------------------
     use_proxyfix_env = os.environ.get("USE_PROXYFIX", "").strip().lower()
-    prod_like = not (app.debug or app.testing)
+    prod_like = _is_prod_like(app)
 
-    use_proxyfix = False
     if use_proxyfix_env in ("1", "true", "yes", "on"):
         use_proxyfix = True
     elif use_proxyfix_env in ("0", "false", "no", "off"):
@@ -59,38 +113,34 @@ def create_app(config_class=Config):
         )
 
     # -------------------------
-    # P0-1: Login brute-force koruması (Database tabanlı)
+    # Login brute-force koruması (blok kontrolü)
     # -------------------------
     @app.before_request
     def _login_throttle_guard():
-        """
-        Login brute-force koruması:
-        - Bu guard SADECE engel süresi (blocked_until) aktif mi diye kontrol eder.
-        - Sayaç (count) artırma işi login route'larının içinde, yalnızca BAŞARISIZ girişte yapılmalıdır.
-        - Başarılı girişte ise sayaç kaydı sıfırlanmalı/silinmelidir (login route içinde).
-        """
         if request.method != "POST":
             return None
 
         path = request.path or ""
-        if path not in ("/admin/login", "/business/login", "/courier/login"):
+        if path not in LOGIN_PATHS:
             return None
 
-        ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip() or "unknown"
-
         from .models import LoginAttempt
+
+        ip = _client_ip()
         attempt = LoginAttempt.query.filter_by(ip=ip, path=path).first()
         now = datetime.now()
 
-        # Engel süresi dolduysa kaydı temizle
         if attempt and attempt.blocked_until and now > attempt.blocked_until:
-            db.session.delete(attempt)
-            db.session.commit()
+            try:
+                db.session.delete(attempt)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                current_app.logger.warning("Login throttle kaydı temizlenemedi.", exc_info=app.debug)
             attempt = None
 
-        # Engel devam ediyorsa durdur
         if attempt and attempt.blocked_until and now < attempt.blocked_until:
-            current_app.logger.warning(f"Login throttle BLOCK: ip={ip} path={path}")
+            current_app.logger.warning("Login throttle BLOCK: ip=%s path=%s", ip, path)
             abort(429)
 
         return None
@@ -104,18 +154,20 @@ def create_app(config_class=Config):
         )
 
     # -------------------------
-    # P0-2: RBAC (Admin / İşletme / Kurye) tek merkezden zorunlu kıl
+    # RBAC (Admin / İşletme / Kurye) tek merkezden zorunlu kıl
     # -------------------------
     @app.before_request
     def _rbac_guard():
         bp = request.blueprint
+        endpoint = request.endpoint
+
         if not bp:
             return None
 
-        if bp == "static" or request.endpoint == "static":
+        if bp == "static" or endpoint == "static":
             return None
 
-        if request.endpoint in ("bp_admin.login", "bp_business.login", "bp_courier.login"):
+        if endpoint in ("bp_admin.login", "bp_business.login", "bp_courier.login"):
             return None
 
         if bp == "bp_admin":
@@ -139,23 +191,26 @@ def create_app(config_class=Config):
         return None
 
     # -------------------------
-    # P0-3b: Otomatik Audit Log (kritik istekler)
+    # Otomatik Audit Log (kritik istekler)
     # -------------------------
     @app.after_request
     def _audit_state_changing_requests(response):
         try:
             path = request.path or ""
-            # SADECE admin/business/courier alanlarını URL prefix ile yakala
-            if not (path.startswith("/admin") or path.startswith("/business") or path.startswith("/courier")):
-                return response
-            # Sadece state-changing istekleri logla
-            if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
-                return response
-            # Login POST'larını burada loglamıyoruz
-            if path in ("/admin/login", "/business/login", "/courier/login"):
+
+            if not path.startswith(PROTECTED_PREFIXES):
                 return response
 
-            # Actor tespiti
+            if request.method not in AUDITED_METHODS:
+                return response
+
+            if path in LOGIN_PATHS:
+                return response
+
+            # Audit tablosu migration ile oluşmadıysa uygulamayı kırma
+            if not _audit_table_exists():
+                return response
+
             actor_type = "system"
             actor_id = None
             if path.startswith("/admin") and "admin_id" in session:
@@ -165,15 +220,17 @@ def create_app(config_class=Config):
             elif path.startswith("/courier") and "kurye_id" in session:
                 actor_type, actor_id = "kurye", session.get("kurye_id")
 
-            ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip() or None
+            ip = _client_ip()
             ua = request.headers.get("User-Agent") or None
             action = f"{request.method} {request.endpoint or path}"
             details = {
                 "path": path,
+                "endpoint": request.endpoint,
                 "status_code": int(getattr(response, "status_code", 0) or 0),
             }
 
             from .models import create_audit_log
+
             create_audit_log(
                 actor_type=actor_type,
                 actor_id=actor_id,
@@ -197,30 +254,28 @@ def create_app(config_class=Config):
         return response
 
     # -------------------------
-    # P0: Güvenlik header'ları
+    # Güvenlik header'ları
     # -------------------------
     @app.after_request
     def _set_security_headers(response):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-        response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+        response.headers.setdefault("Permissions-Policy", "geolocation=(self), microphone=(), camera=()")
+        response.headers.setdefault("Content-Security-Policy", _build_csp(app))
 
-        if not (app.debug or app.testing):
+        if not prod_like:
+            response.headers.setdefault("Cache-Control", "no-store")
+
+        if prod_like:
             response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 
         return response
 
-    # Eklentileri uygulamaya bağla
-    db.init_app(app)
-    migrate.init_app(app, db)
-    mail.init_app(app)
-    csrf.init_app(app)
-
-    # Context processor'ı tanımla
     @app.context_processor
     def utility_processor():
         from .models import Bildirimler
+
         unread_notifications = []
         unread_count = 0
         view_all_notifications_url = None
@@ -272,7 +327,6 @@ def create_app(config_class=Config):
             view_all_notifications_url=view_all_notifications_url,
         )
 
-    # CLI komutlarını ve Blueprint'leri uygulama bağlamı içinde kaydet
     with app.app_context():
         from . import models
 
@@ -298,20 +352,17 @@ def create_app(config_class=Config):
             else:
                 print(f"- '{ayar_kargo_ucreti_adi}' ayarı zaten mevcut: {sabit_kargo_ayari.ayar_degeri} TL.")
 
-            # ADMIN P0 FIX: Varsayılan şifre riskini temizle
             admin_kullanici_adi_str = os.environ.get("ADMIN_USER", "admin")
             admin_sifre_str = os.environ.get("ADMIN_PASS")
             admin_email_str = os.environ.get("ADMIN_EMAIL", "admin@example.com")
 
             if not admin_sifre_str:
-                # Ortam değişkeni yoksa rastgele güvenli şifre üret (P0 fix)
                 admin_sifre_str = secrets.token_urlsafe(16)
-                print(f"!!! GÜVENLİK UYARISI: ADMIN_PASS ortam değişkeni bulunamadı.")
+                print("!!! GÜVENLİK UYARISI: ADMIN_PASS ortam değişkeni bulunamadı.")
                 print(f"!!! YENİ ÜRETİLEN GEÇİCİ ADMIN ŞİFRESİ: {admin_sifre_str}")
                 print("!!! Lütfen bu şifreyi kaydedin ve giriş yaptıktan sonra değiştirin.")
 
             admin_kullanicisi = models.AdminKullanicilar.query.filter_by(kullanici_adi=admin_kullanici_adi_str).first()
-
             if not admin_kullanicisi:
                 hashed_sifre = generate_password_hash(admin_sifre_str)
                 yeni_admin = models.AdminKullanicilar(
@@ -322,32 +373,39 @@ def create_app(config_class=Config):
                 db.session.add(yeni_admin)
                 print(f"- '{admin_kullanici_adi_str}' adlı admin kullanıcısı oluşturuldu.")
             else:
-                # Eğer env'den gelen şifre farklıysa güncelle (kolay yönetim için)
                 if admin_sifre_str and not check_password_hash(admin_kullanicisi.sifre_hash, admin_sifre_str):
                     admin_kullanicisi.sifre_hash = generate_password_hash(admin_sifre_str)
                     print(f"- '{admin_kullanici_adi_str}' adlı admin kullanıcısının şifresi güncellendi.")
                 else:
                     print(f"- '{admin_kullanici_adi_str}' adlı admin kullanıcısı zaten mevcut.")
 
-            # KURYE INIT-DATA
-            kurye_kullanici_adi_str = os.environ.get("COURIER_USER", "kurye1")
-            kurye_sifre_str = os.environ.get("COURIER_PASS", "kurye1sifre")
-            kurye_ad_soyad_str = os.environ.get("COURIER_NAME", "Ali Kurye")
-            kurye_telefon_str = os.environ.get("COURIER_PHONE", "05001234567")
+            kurye_kullanici_adi_str = os.environ.get("COURIER_USER", "").strip()
+            kurye_sifre_str = os.environ.get("COURIER_PASS", "").strip()
+            kurye_ad_soyad_str = os.environ.get("COURIER_NAME", "Ali Kurye").strip() or "Ali Kurye"
+            kurye_telefon_str = os.environ.get("COURIER_PHONE", "05001234567").strip() or "05001234567"
 
-            kurye_kullanicisi_db = models.Kuryeler.query.filter_by(kullanici_adi=kurye_kullanici_adi_str).first()
-            if not kurye_kullanicisi_db:
-                yeni_kurye_obj = models.Kuryeler(
-                    kullanici_adi=kurye_kullanici_adi_str,
-                    ad_soyad=kurye_ad_soyad_str,
-                    telefon=kurye_telefon_str,
-                    email=f"{kurye_kullanici_adi_str}@example.com",
-                )
-                yeni_kurye_obj.set_password(kurye_sifre_str)
-                db.session.add(yeni_kurye_obj)
-                print(f"- '{kurye_kullanici_adi_str}' adlı kurye oluşturuldu.")
+            if kurye_kullanici_adi_str:
+                kurye_kullanicisi_db = models.Kuryeler.query.filter_by(kullanici_adi=kurye_kullanici_adi_str).first()
+                if not kurye_kullanicisi_db:
+                    if not kurye_sifre_str:
+                        kurye_sifre_str = secrets.token_urlsafe(16)
+                        print("!!! GÜVENLİK UYARISI: COURIER_PASS ortam değişkeni bulunamadı.")
+                        print(f"!!! YENİ ÜRETİLEN GEÇİCİ KURYE ŞİFRESİ: {kurye_sifre_str}")
+                        print("!!! Lütfen bu şifreyi güvenli şekilde saklayın ve ilk giriş sonrası değiştirin.")
+
+                    yeni_kurye_obj = models.Kuryeler(
+                        kullanici_adi=kurye_kullanici_adi_str,
+                        ad_soyad=kurye_ad_soyad_str,
+                        telefon=kurye_telefon_str,
+                        email=f"{kurye_kullanici_adi_str}@example.com",
+                    )
+                    yeni_kurye_obj.set_password(kurye_sifre_str)
+                    db.session.add(yeni_kurye_obj)
+                    print(f"- '{kurye_kullanici_adi_str}' adlı kurye oluşturuldu.")
+                else:
+                    print(f"- '{kurye_kullanici_adi_str}' adlı kurye zaten mevcut.")
             else:
-                print(f"- '{kurye_kullanici_adi_str}' adlı kurye zaten mevcut.")
+                print("- COURIER_USER tanımlı değil; varsayılan kurye oluşturulmadı.")
 
             try:
                 db.session.commit()
@@ -358,7 +416,6 @@ def create_app(config_class=Config):
                 if app.debug:
                     current_app.logger.error(f"init-data commit hatası: {e}", exc_info=True)
 
-        # Blueprint'ler
         from .routes_admin import bp_admin
         app.register_blueprint(bp_admin)
 

@@ -4,12 +4,12 @@ from flask import (
     redirect, url_for, current_app, send_file, request, jsonify
 )
 from .models import (
-    Kargolar, Isletmeler, IsletmeOdemeleri, 
-    OdemeKargoIliskileri, Bildirimler, KargoDurumEnum, AdminKullanicilar 
+    Kargolar, Isletmeler, IsletmeOdemeleri,
+    OdemeKargoIliskileri, Bildirimler, KargoDurumEnum, AdminKullanicilar, Kuryeler
 )
 from . import db
-from .utils import normalize_to_e164_tr, create_notification 
-from weasyprint import HTML, CSS
+from .utils import normalize_to_e164_tr, create_notification
+from weasyprint import HTML
 from decimal import Decimal
 import io
 import base64
@@ -19,9 +19,64 @@ import re
 from barcode import Code128
 from barcode.writer import ImageWriter
 from .utils import generate_reset_token, verify_reset_token, send_email_notification
-from werkzeug.security import generate_password_hash
 
 bp_common = Blueprint('bp_common', __name__, template_folder='templates')
+
+
+PUBLIC_TRACK_SESSION_KEY = "public_track_verified"
+PUBLIC_TRACK_SESSION_TTL_SECONDS = 1800
+
+
+def _grant_public_tracking_access(takip_numarasi):
+    verified_map = session.get(PUBLIC_TRACK_SESSION_KEY, {})
+    verified_map[str(takip_numarasi)] = int(datetime.now().timestamp())
+    session[PUBLIC_TRACK_SESSION_KEY] = verified_map
+    session.modified = True
+
+
+def _has_public_tracking_access(takip_numarasi):
+    takip_numarasi = str(takip_numarasi or "").strip()
+    if not takip_numarasi:
+        return False
+
+    verified_map = session.get(PUBLIC_TRACK_SESSION_KEY, {})
+    granted_at = verified_map.get(takip_numarasi)
+    if granted_at is None:
+        return False
+
+    now_ts = int(datetime.now().timestamp())
+    if now_ts - int(granted_at) > PUBLIC_TRACK_SESSION_TTL_SECONDS:
+        verified_map.pop(takip_numarasi, None)
+        session[PUBLIC_TRACK_SESSION_KEY] = verified_map
+        session.modified = True
+        return False
+
+    return True
+
+
+def _validate_password_strength(password):
+    password = password or ""
+
+    if len(password) < 8:
+        return "Şifre en az 8 karakter uzunluğunda olmalıdır."
+
+    if not re.search(r"[a-z]", password) or not re.search(r"[A-Z]", password) or not re.search(r"[0-9]", password):
+        return "Şifreniz en az bir büyük harf, bir küçük harf ve bir rakam içermelidir."
+
+    return None
+
+
+def _find_user_for_reset(email, user_type):
+    email = (email or "").strip()
+    user_type = (user_type or "").strip()
+
+    if user_type == "admin":
+        return AdminKullanicilar.query.filter_by(email=email).first()
+    if user_type == "isletme":
+        return Isletmeler.query.filter_by(isletme_email=email).first()
+    if user_type == "kurye":
+        return Kuryeler.query.filter_by(email=email).first()
+    return None
 
 
 # --- ANA SAYFA YÖNLENDİRMESİ ---
@@ -216,54 +271,85 @@ def track_shipment_public_input():
                 error_message = f"'{takip_no_param}' takip numaralı kargo bulunamadı."
             else:
                 normalized_form_phone = normalize_to_e164_tr(alici_telefon_param_form)
-                db_phone = kargo_db.alici_telefon 
+                db_phone = kargo_db.alici_telefon
 
                 if normalized_form_phone and db_phone and normalized_form_phone == db_phone:
                     kargo = kargo_db
+                    _grant_public_tracking_access(kargo_db.takip_numarasi)
                 else:
-                    error_message = f"Girdiğiniz bilgilerle eşleşen bir kargo kaydı bulunamadı. Lütfen bilgilerinizi kontrol edin."
+                    error_message = "Girdiğiniz bilgilerle eşleşen bir kargo kaydı bulunamadı. Lütfen bilgilerinizi kontrol edin."
                     if not normalized_form_phone:
-                         current_app.logger.warning(f"Halka açık takip: Girilen telefon ({alici_telefon_param_form}) normalleştirilemedi. Takip No: {takip_no_param}")
-        
-        return render_template('public_track_input.html', kargo=kargo, error_message=error_message, takip_no_param=takip_no_param, alici_telefon_param=alici_telefon_param_form, KargoDurumEnum=KargoDurumEnum)
+                        current_app.logger.warning(
+                            f"Halka açık takip: Girilen telefon ({alici_telefon_param_form}) normalleştirilemedi. Takip No: {takip_no_param}"
+                        )
 
-    if takip_no_param and not alici_telefon_param_form: 
+        return render_template(
+            'public_track_input.html',
+            kargo=kargo,
+            error_message=error_message,
+            takip_no_param=takip_no_param,
+            alici_telefon_param=alici_telefon_param_form,
+            KargoDurumEnum=KargoDurumEnum,
+        )
+
+    if takip_no_param and not alici_telefon_param_form:
         error_message = "Lütfen alıcı telefon numarasını da girerek sorgulama yapın."
-    
-    return render_template('public_track_input.html', kargo=kargo, error_message=error_message, takip_no_param=takip_no_param, alici_telefon_param=alici_telefon_param_form, KargoDurumEnum=KargoDurumEnum)
+
+    return render_template(
+        'public_track_input.html',
+        kargo=kargo,
+        error_message=error_message,
+        takip_no_param=takip_no_param,
+        alici_telefon_param=alici_telefon_param_form,
+        KargoDurumEnum=KargoDurumEnum,
+    )
 
 
 @bp_common.route('/update-receiver-temporary-location', methods=['POST'])
 def update_receiver_temporary_location():
-    data = request.get_json()
+    data = request.get_json(silent=True)
     if not data:
         return jsonify(success=False, message="Geçersiz istek verisi."), 400
 
-    takip_no = data.get('takip_no')
+    takip_no = (data.get('takip_no') or '').strip()
     latitude = data.get('latitude')
     longitude = data.get('longitude')
 
     if not takip_no or latitude is None or longitude is None:
         return jsonify(success=False, message="Eksik bilgi: Takip no, enlem veya boylam."), 400
 
+    if not _has_public_tracking_access(takip_no):
+        current_app.logger.warning(
+            f"Yetkisiz geçici konum denemesi. Takip No: {takip_no}, IP: {(request.headers.get('X-Forwarded-For') or request.remote_addr)}"
+        )
+        return jsonify(success=False, message="Bu işlem için önce takip ekranında doğrulama yapmalısınız."), 403
+
+    try:
+        latitude = float(latitude)
+        longitude = float(longitude)
+    except (TypeError, ValueError):
+        return jsonify(success=False, message="Geçersiz enlem/boylam formatı."), 400
+
+    if latitude < -90 or latitude > 90 or longitude < -180 or longitude > 180:
+        return jsonify(success=False, message="Geçersiz koordinat aralığı."), 400
+
     try:
         kargo = Kargolar.query.filter_by(takip_numarasi=takip_no).first()
         if not kargo:
             return jsonify(success=False, message="Kargo bulunamadı."), 404
 
-        if kargo.kargo_durumu != KargoDurumEnum.DAGITIMDA: 
-            return jsonify(success=False, message=f"Kargo şu anda dağıtımda olmadığı için (Durum: {kargo.kargo_durumu.value}) geçici konum paylaşılamaz."), 403
+        if kargo.kargo_durumu != KargoDurumEnum.DAGITIMDA:
+            return jsonify(
+                success=False,
+                message=f"Kargo şu anda dağıtımda olmadığı için (Durum: {kargo.kargo_durumu.value}) geçici konum paylaşılamaz.",
+            ), 403
 
-        kargo.alici_gecici_enlem = float(latitude)
-        kargo.alici_gecici_boylam = float(longitude)
+        kargo.alici_gecici_enlem = latitude
+        kargo.alici_gecici_boylam = longitude
         kargo.alici_gecici_konum_zamani = datetime.now()
-        
+
         db.session.commit()
-        
         return jsonify(success=True, message="Geçici teslimat konumu başarıyla kaydedildi.")
-    except ValueError: 
-        db.session.rollback()
-        return jsonify(success=False, message="Geçersiz enlem/boylam formatı."), 400
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Alıcı geçici konumu güncellenirken hata (Takip No: {takip_no}): {e}", exc_info=True)
@@ -383,23 +469,14 @@ def generate_payment_statement_pdf(odeme_id):
 @bp_common.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
-        email = request.form.get('email')
-        user_type = request.form.get('user_type') # 'admin', 'isletme' veya 'kurye'
+        email = (request.form.get('email') or '').strip()
+        user_type = (request.form.get('user_type') or '').strip()
 
-        # Kullanıcıyı veritabanında ara
-        user = None
-        if user_type == 'admin':
-            user = AdminKullanicilar.query.filter_by(email=email).first()
-        elif user_type == 'isletme':
-            user = Isletmeler.query.filter_by(isletme_email=email).first()
-        elif user_type == 'kurye':
-            user = Kuryeler.query.filter_by(email=email).first()
+        user = _find_user_for_reset(email, user_type)
 
-        if user:
+        if user and email and user_type in ('admin', 'isletme', 'kurye'):
             token = generate_reset_token(email, user_type)
             reset_url = url_for('bp_common.reset_password', token=token, _external=True)
-            
-            # E-posta gönder (Şablonu bir sonraki adımda oluşturacağız)
             send_email_notification(
                 recipient_email=email,
                 subject="Şifre Sıfırlama İsteği",
@@ -407,12 +484,12 @@ def forgot_password():
                 reset_url=reset_url,
                 user_name=getattr(user, 'isletme_adi', getattr(user, 'ad_soyad', user.kullanici_adi))
             )
-            flash("Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.", "success")
-            return redirect(url_for('bp_common.index'))
-        else:
-            flash("Bu e-posta adresiyle kayıtlı bir kullanıcı bulunamadı.", "error")
+
+        flash("Eğer bilgiler sistemde kayıtlıysa, şifre sıfırlama bağlantısı e-posta adresinize gönderildi.", "success")
+        return redirect(url_for('bp_common.index'))
 
     return render_template('forgot_password.html')
+
 
 @bp_common.route('/reset-password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
@@ -422,41 +499,30 @@ def reset_password(token):
         return redirect(url_for('bp_common.forgot_password'))
 
     if request.method == 'POST':
-        new_password = request.form.get('password')
-        
-        # --- GÜÇLÜ ŞİFRE KONTROLÜ (YENİ) ---
-        # 1. Uzunluk kontrolü
-        if len(new_password) < 8:
-            flash("Şifre en az 8 karakter uzunluğunda olmalıdır.", "error")
+        new_password = request.form.get('password') or ''
+        password_error = _validate_password_strength(new_password)
+        if password_error:
+            flash(password_error, 'error')
             return render_template('reset_password_form.html', token=token)
-        
-        # 2. Karmaşıklık kontrolü (Büyük harf, küçük harf ve rakam)
-        if not re.search(r"[a-z]", new_password) or \
-           not re.search(r"[A-Z]", new_password) or \
-           not re.search(r"[0-9]", new_password):
-            flash("Şifreniz en az bir büyük harf, bir küçük harf ve bir rakam içermelidir.", "error")
-            return render_template('reset_password_form.html', token=token)
-        # ----------------------------------
 
-        email = data['email']
-        user_type = data['user_type']
+        email = data.get('email')
+        user_type = data.get('user_type')
+        user = _find_user_for_reset(email, user_type)
 
-        user = None
-        if user_type == 'admin':
-            user = AdminKullanicilar.query.filter_by(email=email).first()
-        elif user_type == 'isletme':
-            user = Isletmeler.query.filter_by(isletme_email=email).first()
-        elif user_type == 'kurye':
-            user = Kuryeler.query.filter_by(email=email).first()
+        if not user:
+            flash("Bu sıfırlama bağlantısı artık kullanılamıyor.", "error")
+            return redirect(url_for('bp_common.forgot_password'))
 
-        if user:
+        try:
             user.set_password(new_password)
             db.session.commit()
             flash("Şifreniz başarıyla güncellendi. Yeni şifrenizle giriş yapabilirsiniz.", "success")
             return redirect(url_for('bp_common.index'))
-        else:
-            flash("Kullanıcı bulunamadı.", "error")
-            return redirect(url_for('bp_common.forgot_password'))
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Şifre sıfırlama commit hatası: {e}", exc_info=True)
+            flash("Şifre güncellenirken bir hata oluştu. Lütfen tekrar deneyin.", "error")
+            return render_template('reset_password_form.html', token=token)
 
     return render_template('reset_password_form.html', token=token)
 
