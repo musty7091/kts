@@ -1,8 +1,8 @@
-"""empty message
+"""initial
 
-Revision ID: a793c3419f65
+Revision ID: a54506374a3e
 Revises: 
-Create Date: 2025-05-21 15:41:06.755883
+Create Date: 2026-02-28 19:42:46.027246
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'a793c3419f65'
+revision = 'a54506374a3e'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -28,6 +28,25 @@ def upgrade():
     sa.UniqueConstraint('email'),
     sa.UniqueConstraint('kullanici_adi')
     )
+    op.create_table('audit_log',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('actor_type', sa.String(length=20), nullable=False),
+    sa.Column('actor_id', sa.Integer(), nullable=True),
+    sa.Column('action', sa.String(length=120), nullable=False),
+    sa.Column('entity_type', sa.String(length=60), nullable=True),
+    sa.Column('entity_id', sa.Integer(), nullable=True),
+    sa.Column('ip', sa.String(length=45), nullable=True),
+    sa.Column('user_agent', sa.String(length=255), nullable=True),
+    sa.Column('details_json', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('audit_log', schema=None) as batch_op:
+        batch_op.create_index('ix_audit_log_action', ['action'], unique=False)
+        batch_op.create_index('ix_audit_log_actor', ['actor_type', 'actor_id'], unique=False)
+        batch_op.create_index('ix_audit_log_created_at', ['created_at'], unique=False)
+        batch_op.create_index('ix_audit_log_entity', ['entity_type', 'entity_id'], unique=False)
+
     op.create_table('ayarlar',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('ayar_adi', sa.String(length=100), nullable=False),
@@ -71,6 +90,18 @@ def upgrade():
     sa.UniqueConstraint('kullanici_adi'),
     sa.UniqueConstraint('telefon')
     )
+    op.create_table('login_attempts',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('ip', sa.String(length=45), nullable=False),
+    sa.Column('path', sa.String(length=100), nullable=False),
+    sa.Column('count', sa.Integer(), nullable=True),
+    sa.Column('last_attempt_at', sa.DateTime(), nullable=True),
+    sa.Column('blocked_until', sa.DateTime(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('login_attempts', schema=None) as batch_op:
+        batch_op.create_index('ix_login_attempt_ip_path', ['ip', 'path'], unique=False)
+
     op.create_table('bildirimler',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('admin_id', sa.Integer(), nullable=True),
@@ -148,8 +179,19 @@ def downgrade():
     op.drop_table('kargolar')
     op.drop_table('isletme_odemeleri')
     op.drop_table('bildirimler')
+    with op.batch_alter_table('login_attempts', schema=None) as batch_op:
+        batch_op.drop_index('ix_login_attempt_ip_path')
+
+    op.drop_table('login_attempts')
     op.drop_table('kuryeler')
     op.drop_table('isletmeler')
     op.drop_table('ayarlar')
+    with op.batch_alter_table('audit_log', schema=None) as batch_op:
+        batch_op.drop_index('ix_audit_log_entity')
+        batch_op.drop_index('ix_audit_log_created_at')
+        batch_op.drop_index('ix_audit_log_actor')
+        batch_op.drop_index('ix_audit_log_action')
+
+    op.drop_table('audit_log')
     op.drop_table('admin_kullanicilar')
     # ### end Alembic commands ###

@@ -6,19 +6,116 @@ from flask import (
 )
 from .models import (
     Isletmeler, Kargolar, Ayarlar, IsletmeOdemeleri,
-    OdemeKargoIliskileri, AdminKullanicilar, KargoDurumEnum
+    OdemeKargoIliskileri, AdminKullanicilar, KargoDurumEnum, LoginAttempt
 )
 from . import db
 from .utils import (
     isletme_required, create_notification, send_email_notification,
     normalize_to_e164_tr, kktc_konumlar
 )
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from decimal import Decimal, InvalidOperation
 from sqlalchemy import func
 from werkzeug.security import check_password_hash, generate_password_hash
 
 bp_business = Blueprint('bp_business', __name__, template_folder='templates', url_prefix='/business')
+
+LOGIN_MAX_ATTEMPTS = 30
+LOGIN_BLOCK_MINUTES = 15
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+SPECIAL_CHAR_REGEX = re.compile(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?~`]")
+
+
+def _get_client_ip():
+    forwarded_for = request.headers.get('X-Forwarded-For', '')
+    if forwarded_for:
+        return forwarded_for.split(',')[0].strip()
+    return request.remote_addr or 'unknown'
+
+
+def _get_login_attempt(ip_address: str, path: str):
+    return LoginAttempt.query.filter_by(ip=ip_address, path=path).first()
+
+
+def _clear_login_attempt(ip_address: str, path: str):
+    existing = _get_login_attempt(ip_address, path)
+    if existing:
+        db.session.delete(existing)
+        db.session.commit()
+
+
+def _record_failed_login(ip_address: str, path: str):
+    now = datetime.now()
+    login_attempt = _get_login_attempt(ip_address, path)
+
+    if login_attempt:
+        if login_attempt.blocked_until and login_attempt.blocked_until > now:
+            return login_attempt
+
+        if login_attempt.last_attempt_at and (now - login_attempt.last_attempt_at) > timedelta(minutes=LOGIN_BLOCK_MINUTES):
+            login_attempt.count = 0
+            login_attempt.blocked_until = None
+
+        login_attempt.count = (login_attempt.count or 0) + 1
+        login_attempt.last_attempt_at = now
+
+        if login_attempt.count >= LOGIN_MAX_ATTEMPTS:
+            login_attempt.blocked_until = now + timedelta(minutes=LOGIN_BLOCK_MINUTES)
+    else:
+        login_attempt = LoginAttempt(
+            ip=ip_address,
+            path=path,
+            count=1,
+            last_attempt_at=now,
+            blocked_until=None
+        )
+        db.session.add(login_attempt)
+
+    db.session.commit()
+    return login_attempt
+
+
+def _is_login_blocked(ip_address: str, path: str):
+    login_attempt = _get_login_attempt(ip_address, path)
+    if not login_attempt:
+        return False, None
+
+    now = datetime.now()
+
+    if login_attempt.blocked_until and login_attempt.blocked_until > now:
+        return True, login_attempt.blocked_until
+
+    if login_attempt.blocked_until and login_attempt.blocked_until <= now:
+        login_attempt.blocked_until = None
+        login_attempt.count = 0
+        db.session.commit()
+
+    return False, None
+
+
+def _validate_password_strength(password: str):
+    errors = []
+    if len(password or '') < 8:
+        errors.append("Yeni şifre en az 8 karakter olmalıdır.")
+    if not re.search(r"[A-Z]", password or ''):
+        errors.append("Yeni şifre en az bir büyük harf içermelidir.")
+    if not re.search(r"[a-z]", password or ''):
+        errors.append("Yeni şifre en az bir küçük harf içermelidir.")
+    if not re.search(r"[0-9]", password or ''):
+        errors.append("Yeni şifre en az bir rakam içermelidir.")
+    if not SPECIAL_CHAR_REGEX.search(password or ''):
+        errors.append("Yeni şifre en az bir özel karakter içermelidir.")
+    return errors
+
+
+def _get_standard_service_fee():
+    sabit_kargo_ayari = Ayarlar.query.filter_by(ayar_adi='sabit_kargo_hizmet_bedeli').first()
+    if sabit_kargo_ayari and sabit_kargo_ayari.ayar_degeri:
+        try:
+            return Decimal(str(sabit_kargo_ayari.ayar_degeri).replace(',', '.'))
+        except (InvalidOperation, ValueError):
+            current_app.logger.warning("sabit_kargo_hizmet_bedeli ayarı geçersiz, varsayılan 100.00 kullanılacak.")
+    return Decimal('100.00')
 
 
 @bp_business.route('/login', methods=['GET', 'POST'])
@@ -27,6 +124,17 @@ def login():
         return redirect(url_for('bp_business.dashboard'))
 
     if request.method == 'POST':
+        ip_address = _get_client_ip()
+        path = request.path
+
+        blocked, blocked_until = _is_login_blocked(ip_address, path)
+        if blocked:
+            flash(
+                f'Çok fazla hatalı giriş denemesi yapıldı. Lütfen {blocked_until.strftime("%H:%M")} sonrasında tekrar deneyin.',
+                'error'
+            )
+            return redirect(url_for('bp_business.login'))
+
         kullanici_adi = (request.form.get('kullanici_adi') or '').strip()
         sifre = request.form.get('sifre') or ''
 
@@ -37,6 +145,12 @@ def login():
         isletme_obj = Isletmeler.query.filter_by(kullanici_adi=kullanici_adi).first()
 
         if isletme_obj and isletme_obj.aktif_mi and check_password_hash(isletme_obj.sifre_hash, sifre):
+            try:
+                _clear_login_attempt(ip_address, path)
+            except Exception as e_clear:
+                db.session.rollback()
+                current_app.logger.warning(f"Business login deneme kaydı temizlenemedi: {e_clear}")
+
             session.clear()
             session.permanent = True
 
@@ -50,7 +164,19 @@ def login():
         elif isletme_obj and not isletme_obj.aktif_mi:
             flash('İşletme hesabınız pasif durumdadır. Lütfen yönetici ile iletişime geçin.', 'error')
         else:
-            flash('Kullanıcı adı veya şifre hatalı.', 'error')
+            try:
+                attempt = _record_failed_login(ip_address, path)
+                if attempt.blocked_until and attempt.blocked_until > datetime.now():
+                    flash(
+                        f'Çok fazla hatalı giriş denemesi yapıldı. Lütfen {attempt.blocked_until.strftime("%H:%M")} sonrasında tekrar deneyin.',
+                        'error'
+                    )
+                else:
+                    flash('Kullanıcı adı veya şifre hatalı.', 'error')
+            except Exception as e_attempt:
+                db.session.rollback()
+                current_app.logger.error(f"Business login failed attempt kaydedilemedi: {e_attempt}", exc_info=True)
+                flash('Kullanıcı adı veya şifre hatalı.', 'error')
 
         return redirect(url_for('bp_business.login'))
 
@@ -60,7 +186,6 @@ def login():
 @bp_business.route('/dashboard')
 @isletme_required
 def dashboard():
-    # @isletme_required sayesinde manuel session kontrolü kaldırıldı, içerik aynıdır.
     isletme_id_session = session['isletme_id']
     isletme_verileri = {}
 
@@ -108,7 +233,6 @@ def dashboard():
         isletmenin_kargolari = query.order_by(Kargolar.olusturulma_tarihi.desc()).all()
         isletme_verileri['kargolar'] = isletmenin_kargolari
 
-        # Temel Kargo İstatistikleri
         isletme_verileri['toplam_kargo_sayisi'] = Kargolar.query.filter_by(isletme_id=isletme_id_session).count()
         isletme_verileri['teslim_edilen_kargo_sayisi'] = Kargolar.query.filter_by(
             isletme_id=isletme_id_session, kargo_durumu=KargoDurumEnum.TESLIM_EDILDI
@@ -122,9 +246,6 @@ def dashboard():
         isletme_verileri['teslim_edilen_kargo_sayisi'] = 0
 
     try:
-        # İŞLETME HESAP ÖZETİ HESAPLAMALARI (Sadece Teslim Edilmiş ve Mahsuplaşmamış olanlar)
-
-        # 1. İşletmenin kargo firmasından alacağı (Kapıda nakit tahsil edilen ürün bedelleri)
         bekleyen_tahsilat = db.session.query(
             func.sum(Kargolar.isletmeye_aktarilacak_tutar)
         ).filter(
@@ -133,7 +254,6 @@ def dashboard():
             Kargolar.kargo_durumu == KargoDurumEnum.TESLIM_EDILDI
         ).scalar() or Decimal('0.00')
 
-        # 2. İşletmenin kargo firmasına olan hizmet bedeli borcu (Teslim edilen tüm kargoların ücreti)
         bekleyen_hizmet_bedeli = db.session.query(
             func.sum(Kargolar.kargo_ucreti_isletme_borcu)
         ).filter(
@@ -142,7 +262,6 @@ def dashboard():
             Kargolar.kargo_durumu == KargoDurumEnum.TESLIM_EDILDI
         ).scalar() or Decimal('0.00')
 
-        # 3. Güncel Net Bakiye (Alacak - Borç)
         guncel_net_bakiye = bekleyen_tahsilat - bekleyen_hizmet_bedeli
 
         isletme_verileri['bekleyen_tahsilat'] = bekleyen_tahsilat
@@ -206,7 +325,7 @@ def add_shipment():
                 flash('Geçersiz alıcı telefon numarası formatı. Lütfen E.164 formatında girin (örn: +905xxxxxxxxx).', 'error')
                 return render_template('business_add_shipment.html', **template_context)
 
-            if alici_email_form and not re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", alici_email_form):
+            if alici_email_form and not EMAIL_REGEX.match(alici_email_form):
                 flash('Geçersiz alıcı e-posta formatı.', 'error')
                 return render_template('business_add_shipment.html', **template_context)
 
@@ -243,8 +362,7 @@ def add_shipment():
                 session.pop('isletme_id', None)
                 return redirect(url_for('bp_business.login'))
 
-            sabit_kargo_ayari = Ayarlar.query.filter_by(ayar_adi='sabit_kargo_hizmet_bedeli').first()
-            standart_hizmet_bedeli = Decimal(sabit_kargo_ayari.ayar_degeri.replace(',', '.')) if sabit_kargo_ayari and sabit_kargo_ayari.ayar_degeri else Decimal('100.00')
+            standart_hizmet_bedeli = _get_standard_service_fee()
 
             current_isletme.son_kargo_no = (current_isletme.son_kargo_no or 0) + 1
             takip_numarasi_yeni = f"{current_isletme.isletme_kodu}-{str(current_isletme.son_kargo_no).zfill(6)}"
@@ -406,7 +524,7 @@ def edit_shipment(kargo_id):
             kargo.alici_telefon = normalized_alici_telefon_edit
 
             alici_email_form_edit = request.form.get('alici_email', (kargo.alici_email or '')).strip()
-            if alici_email_form_edit and not re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", alici_email_form_edit):
+            if alici_email_form_edit and not EMAIL_REGEX.match(alici_email_form_edit):
                 flash('Geçersiz alıcı e-posta formatı.', 'error')
                 return render_template('business_edit_shipment.html', **template_context)
             kargo.alici_email = alici_email_form_edit if alici_email_form_edit else None
@@ -434,8 +552,7 @@ def edit_shipment(kargo_id):
 
                 kargo.toplam_tahsil_edilecek_alici = kargo.urun_bedeli_alici_tahsil + kargo.kargo_ucreti_alici_tahsil
 
-                sabit_kargo_ayari = Ayarlar.query.filter_by(ayar_adi='sabit_kargo_hizmet_bedeli').first()
-                standart_hizmet_bedeli = Decimal(sabit_kargo_ayari.ayar_degeri.replace(',', '.')) if sabit_kargo_ayari and sabit_kargo_ayari.ayar_degeri else Decimal('100.00')
+                standart_hizmet_bedeli = _get_standard_service_fee()
 
                 mevcut_kargo_isletme_borcu_guncel = standart_hizmet_bedeli
                 isletmeye_aktarilacak_guncel = Decimal('0.00')
@@ -506,17 +623,7 @@ def change_password():
             form_data['new_password'] = ''
             form_data['confirm_new_password'] = ''
         else:
-            errors = []
-            if len(new_password) < 8:
-                errors.append("Yeni şifre en az 8 karakter olmalıdır.")
-            if not re.search(r"[A-Z]", new_password):
-                errors.append("Yeni şifre en az bir büyük harf içermelidir.")
-            if not re.search(r"[a-z]", new_password):
-                errors.append("Yeni şifre en az bir küçük harf içermelidir.")
-            if not re.search(r"[0-9]", new_password):
-                errors.append("Yeni şifre en az bir rakam içermelidir.")
-            if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?~`]", new_password):
-                errors.append("Yeni şifre en az bir özel karakter içermelidir.")
+            errors = _validate_password_strength(new_password)
 
             if errors:
                 for error_msg in errors:
@@ -540,7 +647,7 @@ def change_password():
     return render_template('business_change_password.html', isletme=isletme, form_data=form_data)
 
 
-@bp_business.route('/logout')
+@bp_business.route('/logout', methods=['GET', 'POST'])
 def logout():
     session.clear()
     flash('Başarıyla çıkış yaptınız.', 'success')
